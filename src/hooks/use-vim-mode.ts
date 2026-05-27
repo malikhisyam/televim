@@ -9,8 +9,8 @@ import { getVisibleItems } from "../lib/chat-list-utils"
 import { parseKey, resetKeymapState, createKeymapState } from "../lib/keymap-engine"
 
 export interface UseVimModeOptions {
-  /** Open the currently selected chat (or thread) */
-  onOpenChat?: (chatId: number, threadId?: number) => void
+  /** Open the currently selected chat (or thread), optionally jumping to a specific message */
+  onOpenChat?: (chatId: number, threadId?: number, targetMessageId?: number) => void
   /** A group was expanded (fetch threads here) */
   onExpandChat?: (chatId: number) => void
   /** Navigate messages up / down; count defaults to 1 */
@@ -21,14 +21,22 @@ export interface UseVimModeOptions {
   onDeleteMessage?: () => void
   /** Start replying to the selected message */
   onReplyMessage?: () => void
+  /** Open the selected message's media link in browser */
+  onOpenLink?: () => void
   /** Message action menu was opened */
   onActionMenu?: () => void
+  /** React to the selected message with an emoticon */
+  onReact?: (emoticon: string) => void
+  /** Forward the selected message to a target chat */
+  onForwardMessage?: (toChatId: number, messageId: number) => void
   /** Execute a colon command (string includes the colon) */
   onCommand?: (command: string) => void
   /** Execute a search query */
   onSearch?: (query: string) => void
+  /** Execute a global search query */
+  onSearchGlobal?: (query: string) => void
   /** Quit the application */
-  onQuit?: () => void
+  onQuit?: () => void | Promise<void>
 }
 
 /**
@@ -44,7 +52,7 @@ export function useVimMode(options: UseVimModeOptions = {}) {
   const keymapRef = useRef(createKeymapState())
 
   useKeyboard(
-    useCallback((key) => {
+    useCallback(async (key) => {
       const state = useStore.getState()
       const opts = optionsRef.current
 
@@ -59,9 +67,220 @@ export function useVimMode(options: UseVimModeOptions = {}) {
         key.stopPropagation()
       }
 
+      // ── Message action menu overlay ──
+      if (state.messageActionMenuVisible) {
+        const actionCount = 7
+        if (keyName === "j" || keyName === "down") {
+          consume()
+          state.setMessageActionMenuIndex((prev) => Math.min(actionCount - 1, prev + 1))
+          return
+        }
+        if (keyName === "k" || keyName === "up") {
+          consume()
+          state.setMessageActionMenuIndex((prev) => Math.max(0, prev - 1))
+          return
+        }
+        if (keyName === "return") {
+          consume()
+          opts.onActionMenu?.()
+          return
+        }
+        // Quick shortcut: press the action letter directly
+        const shortcutMap: Record<string, number> = {
+          r: 0, y: 1, f: 2, p: 3, e: 4, d: 5, t: 6,
+        }
+        const shortcutIndex = shortcutMap[keyName]
+        if (shortcutIndex !== undefined) {
+          consume()
+          state.setMessageActionMenuIndex(shortcutIndex)
+          opts.onActionMenu?.()
+          return
+        }
+        // Any other key (including Escape) closes the menu
+        consume()
+        state.setMessageActionMenuVisible(false)
+        state.setMessageActionMenuIndex(0)
+        // Keep focus on messages pane when closing action menu
+        state.setPaneFocus("messages")
+        return
+      }
+
+      // ── Reaction menu overlay ──
+      if (state.reactionMenuVisible) {
+        const REACTIONS = ["❤️", "👍", "👎", "🔥", "🥰", "👋", "😂"]
+        const reactionCount = REACTIONS.length
+        if (keyName === "j" || keyName === "down") {
+          consume()
+          state.setReactionMenuIndex((prev) => Math.min(reactionCount - 1, prev + 1))
+          return
+        }
+        if (keyName === "k" || keyName === "up") {
+          consume()
+          state.setReactionMenuIndex((prev) => Math.max(0, prev - 1))
+          return
+        }
+        if (keyName === "return") {
+          consume()
+          const emoticon = REACTIONS[state.reactionMenuIndex]
+          if (emoticon) {
+            opts.onReact?.(emoticon)
+          }
+          state.setReactionMenuVisible(false)
+          state.setReactionMenuIndex(0)
+          return
+        }
+        if (keyName === "escape") {
+          consume()
+          state.setReactionMenuVisible(false)
+          state.setReactionMenuIndex(0)
+          state.setPaneFocus("messages")
+          return
+        }
+        return
+      }
+
+      // ── Help overlay ──
+      if (state.helpVisible) {
+        consume()
+        if (keyName === "escape" || keyName === "?") {
+          state.toggleHelp()
+        }
+        return
+      }
+
+      // ── Message search overlay ──
+      if (state.messageSearchVisible) {
+        const results = state.messageSearchResults
+        const maxIndex = Math.max(0, results.length - 1)
+        if (keyName === "return") {
+          consume()
+          if (state.messageSearchGlobal) {
+            // Global search: execute on return if results aren't loaded yet
+            if (results.length === 0) {
+              opts.onSearchGlobal?.(state.messageSearchQuery)
+            } else {
+              const selected = results[state.messageSearchIndex]
+              if (selected) {
+                // For global search, switch to the chat containing the message
+                const targetChat = state.chats.find((c) => c.id === selected.chatId)
+                if (targetChat) {
+                  state.setActiveChat(targetChat)
+                  state.setActiveThreadId(null)
+                  state.setPaneFocus("messages")
+                  opts.onOpenChat?.(selected.chatId, undefined, selected.id)
+                }
+              }
+              state.setMessageSearchVisible(false)
+              state.setMessageSearchIndex(0)
+              state.setMessageSearchQuery("")
+              state.setMessageSearchGlobal(false)
+            }
+            return
+          }
+          const selected = results[state.messageSearchIndex]
+          if (selected) {
+            const storeKey = `${state.activeChat?.id}${state.activeThreadId ? `:${state.activeThreadId}` : ""}`
+            const msgs = state.messages[storeKey] ?? []
+            const msgIndex = msgs.findIndex((m) => m.id === selected.id)
+            if (msgIndex !== -1) {
+              state.setSelectedMessageIndex(msgIndex)
+            }
+          }
+          state.setMessageSearchVisible(false)
+          state.setMessageSearchIndex(0)
+          state.setMessageSearchQuery("")
+          return
+        }
+        if (keyName === "backspace") {
+          consume()
+          state.updateMessageSearchQuery((prev) => {
+            const next = prev.slice(0, -1)
+            if (!state.messageSearchGlobal) {
+              // Local search: re-filter results as query changes
+              const storeKey = `${state.activeChat?.id}${state.activeThreadId ? `:${state.activeThreadId}` : ""}`
+              const allMessages = state.messages[storeKey] ?? []
+              const filtered = next.trim() === ""
+                ? []
+                : allMessages.filter((m) =>
+                    m.content.toLowerCase().includes(next.toLowerCase()) ||
+                    m.senderName.toLowerCase().includes(next.toLowerCase()),
+                  )
+              state.setMessageSearchResults(filtered)
+              if (state.messageSearchIndex >= filtered.length) {
+                state.setMessageSearchIndex(0)
+              }
+            } else if (next.trim().length > 0) {
+              opts.onSearchGlobal?.(next)
+            }
+            return next
+          })
+          return
+        }
+        if (keyName === "escape") {
+          consume()
+          state.setMessageSearchVisible(false)
+          state.setMessageSearchIndex(0)
+          state.setMessageSearchQuery("")
+          state.setMessageSearchResults([])
+          state.setMessageSearchGlobal(false)
+          return
+        }
+        // Tab / Shift+Tab navigate results
+        if (keyName === "tab") {
+          if (results.length > 0) {
+            consume()
+            if (key.shift) {
+              state.setMessageSearchIndex((prev) => Math.max(0, prev - 1))
+            } else {
+              state.setMessageSearchIndex((prev) => Math.min(maxIndex, prev + 1))
+            }
+          }
+          return
+        }
+        // Type any printable character into the search query
+        if (
+          key.sequence &&
+          key.sequence.length === 1 &&
+          !key.ctrl &&
+          !key.meta
+        ) {
+          consume()
+          state.updateMessageSearchQuery((prev) => {
+            const next = prev + key.sequence
+            if (!state.messageSearchGlobal) {
+              // Local search: re-filter results as query changes
+              const storeKey = `${state.activeChat?.id}${state.activeThreadId ? `:${state.activeThreadId}` : ""}`
+              const allMessages = state.messages[storeKey] ?? []
+              const filtered = next.trim() === ""
+                ? []
+                : allMessages.filter((m) =>
+                    m.content.toLowerCase().includes(next.toLowerCase()) ||
+                    m.senderName.toLowerCase().includes(next.toLowerCase()),
+                  )
+              state.setMessageSearchResults(filtered)
+              if (state.messageSearchIndex >= filtered.length) {
+                state.setMessageSearchIndex(0)
+              }
+            } else if (next.trim().length > 0) {
+              // Global search: debounced API call via app.tsx
+              opts.onSearchGlobal?.(next)
+            }
+            return next
+          })
+          return
+        }
+        // Unhandled keys are ignored
+        return
+      }
+
       // ── GLOBAL: Escape always returns to Normal + sidebar focus ──
       if (keyName === "escape") {
         consume()
+        if (state.forwardMessageId) {
+          state.setForwardMessageId(null)
+          state.setPaneFocus("messages")
+          return
+        }
         state.setPaneFocus("sidebar")
         state.resetToNormal()
         return
@@ -218,6 +437,29 @@ export function useVimMode(options: UseVimModeOptions = {}) {
         state.setSelectedSearchIndex(0)
         return
       }
+      if (keyName === "?") {
+        consume()
+        state.toggleHelp()
+        return
+      }
+      if (keyName === "s") {
+        consume()
+        state.setMessageSearchVisible(true)
+        state.setMessageSearchGlobal(false)
+        state.setMessageSearchQuery("")
+        state.setMessageSearchResults([])
+        state.setMessageSearchIndex(0)
+        return
+      }
+      if (keyName === "S") {
+        consume()
+        state.setMessageSearchVisible(true)
+        state.setMessageSearchGlobal(true)
+        state.setMessageSearchQuery("")
+        state.setMessageSearchResults([])
+        state.setMessageSearchIndex(0)
+        return
+      }
 
       // ── Keymap engine integration (counts + multi-key motions) ──
       const hasEngineState =
@@ -314,14 +556,14 @@ export function useVimMode(options: UseVimModeOptions = {}) {
           return
         }
 
-        // Expand / collapse groups
+        // Expand / collapse groups (only channels/supergroups can have threads)
         if (keyName === "l") {
           consume()
           const item = visible[state.selectedListIndex]
-          if (item?.type === "chat" && item.chat.type !== "private") {
+          if (item?.type === "chat" && item.chat.type === "channel" && item.chat.forum) {
             const wasExpanded = state.expandedChatIds.has(item.chat.id)
-            state.toggleExpandedChat(item.chat.id)
             if (!wasExpanded) {
+              state.expandChat(item.chat.id)
               opts.onExpandChat?.(item.chat.id)
             }
           }
@@ -330,14 +572,10 @@ export function useVimMode(options: UseVimModeOptions = {}) {
         if (keyName === "h") {
           consume()
           const item = visible[state.selectedListIndex]
-          if (item?.type === "chat" && item.chat.type !== "private" && state.expandedChatIds.has(item.chat.id)) {
+          if (item?.type === "chat" && item.chat.type === "channel" && item.chat.forum && state.expandedChatIds.has(item.chat.id)) {
             state.collapseChat(item.chat.id)
-            // Clear threads to prevent stale render traces
-            state.setChats(
-              state.chats.map((c) =>
-                c.id === item.chat.id ? { ...c, threads: [] } : c,
-              ),
-            )
+            // Keep threads in state — getVisibleItems won't render them while collapsed,
+            // so re-expansion is instant with no flicker
           }
           return
         }
@@ -348,14 +586,22 @@ export function useVimMode(options: UseVimModeOptions = {}) {
           const item = visible[state.selectedListIndex]
           if (!item) return
 
+          // Forward mode: if a message is queued for forwarding, forward it instead of opening
+          if (state.forwardMessageId && item.type === "chat") {
+            opts.onForwardMessage?.(item.chat.id, state.forwardMessageId)
+            state.setForwardMessageId(null)
+            state.setPaneFocus("messages")
+            return
+          }
+
           if (item.type === "chat") {
             const chat = item.chat
-            if (chat.type !== "private" && !state.expandedChatIds.has(chat.id)) {
-              // Group not yet expanded: expand it
+            if (chat.type === "channel" && chat.forum && !state.expandedChatIds.has(chat.id)) {
+              // Forum channel not yet expanded: expand it to show threads
               state.toggleExpandedChat(chat.id)
               opts.onExpandChat?.(chat.id)
             } else {
-              // Private chat or already-expanded group: open it
+              // Private chat, basic group, or already-expanded channel: open it
               state.setActiveChat(chat)
               state.setActiveThreadId(null)
               state.setSelectedMessageIndex(0)
@@ -372,42 +618,6 @@ export function useVimMode(options: UseVimModeOptions = {}) {
           }
           return
         }
-      }
-
-      // ── Message action menu overlay ──
-      if (state.messageActionMenuVisible) {
-        const actionCount = 7
-        if (keyName === "j" || keyName === "down") {
-          consume()
-          state.setMessageActionMenuIndex((prev) => Math.min(actionCount - 1, prev + 1))
-          return
-        }
-        if (keyName === "k" || keyName === "up") {
-          consume()
-          state.setMessageActionMenuIndex((prev) => Math.max(0, prev - 1))
-          return
-        }
-        if (keyName === "return") {
-          consume()
-          opts.onActionMenu?.()
-          return
-        }
-        // Quick shortcut: press the action letter directly
-        const shortcutMap: Record<string, number> = {
-          r: 0, y: 1, f: 2, p: 3, e: 4, d: 5, t: 6,
-        }
-        const shortcutIndex = shortcutMap[keyName]
-        if (shortcutIndex !== undefined) {
-          consume()
-          state.setMessageActionMenuIndex(shortcutIndex)
-          opts.onActionMenu?.()
-          return
-        }
-        // Any other key closes the menu
-        consume()
-        state.setMessageActionMenuVisible(false)
-        state.setMessageActionMenuIndex(0)
-        return
       }
 
       // ── Messages pane ──
@@ -447,11 +657,16 @@ export function useVimMode(options: UseVimModeOptions = {}) {
           opts.onReplyMessage?.()
           return
         }
+        if (keyName === "o") {
+          consume()
+          opts.onOpenLink?.()
+          return
+        }
       }
 
       if (keyName === "q") {
         consume()
-        opts.onQuit?.()
+        await opts.onQuit?.()
         return
       }
     }, []),

@@ -42,3 +42,27 @@ export function saveConfig(config: TeleVimConfig): void {
     console.error("Failed to save config:", err)
   }
 }
+
+const CLOAK_FILE = join(CONFIG_DIR, "cloak")
+
+export function loadCloakMode(): boolean {
+  try {
+    if (existsSync(CLOAK_FILE)) {
+      return readFileSync(CLOAK_FILE, "utf-8").trim() === "1"
+    }
+  } catch {
+    // ignore
+  }
+  return false
+}
+
+export function saveCloakMode(enabled: boolean): void {
+  try {
+    if (!existsSync(CONFIG_DIR)) {
+      mkdirSync(CONFIG_DIR, { recursive: true })
+    }
+    writeFileSync(CLOAK_FILE, enabled ? "1" : "0")
+  } catch (err) {
+    console.error("Failed to save cloak mode:", err)
+  }
+}

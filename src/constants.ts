@@ -1,6 +1,6 @@
 // src/constants.ts — Keybindings, colors, config defaults
 
-import type { ThemeColors } from "./types"
+import { getTheme } from "./lib/themes"
 
 export const MODES = {
   NORMAL: "normal" as const,
@@ -10,16 +10,7 @@ export const MODES = {
   SEARCH: "search" as const,
 }
 
-export const DEFAULT_THEME: ThemeColors = {
-  fg: "#dbdee1",
-  bg: "#313338",
-  accent: "#5865f2",
-  muted: "#949ba4",
-  border: "#3f4248",
-  success: "#57f287",
-  error: "#ed4245",
-  warning: "#f9a62b",
-}
+export const DEFAULT_THEME = getTheme("default")
 
 export const KEYBINDINGS = {
   NORMAL: {

@@ -4,6 +4,16 @@ import type { ThemeColors } from "../types"
 
 export const THEMES: Record<string, ThemeColors> = {
   default: {
+    fg: "#d0d0d0",
+    bg: "#1a1a1a",
+    accent: "#a0a0a0",
+    muted: "#707070",
+    border: "#404040",
+    success: "#d0d0d0",
+    error: "#e0e0e0",
+    warning: "#b0b0b0",
+  },
+  discord: {
     fg: "#dbdee1",
     bg: "#313338",
     accent: "#5865f2",

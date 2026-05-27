@@ -1,7 +1,8 @@
-// src/components/input-bar.tsx — Discord-style input area
+// src/components/input-bar.tsx — Discord-style input area with per-chat drafts
 
-import { useCallback, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useStore } from "../state/store"
+import { msgStoreKey } from "../lib/message-store"
 
 interface InputBarProps {
   onSendMessage: (text: string) => void
@@ -10,37 +11,110 @@ interface InputBarProps {
 
 export default function InputBar({ onSendMessage, focused }: InputBarProps) {
   const theme = useStore((s) => s.theme)
-  const [text, setText] = useState("")
+  const activeChat = useStore((s) => s.activeChat)
+  const activeThreadId = useStore((s) => s.activeThreadId)
+  const drafts = useStore((s) => s.drafts)
+  const setDraft = useStore((s) => s.setDraft)
+  const replyToMessageId = useStore((s) => s.replyToMessageId)
+  const editMessageId = useStore((s) => s.editMessageId)
+  const messages = useStore((s) => s.messages)
+  const setReplyToMessageId = useStore((s) => s.setReplyToMessageId)
+  const setEditMessageId = useStore((s) => s.setEditMessageId)
+
+  const draftKey = activeChat ? msgStoreKey(activeChat.id, activeThreadId) : ""
+  const savedDraft = drafts[draftKey] ?? ""
+
+  const [text, setText] = useState(savedDraft)
+
+  // Sync local text when switching chats or when draft changes externally
+  // Also prefill with message text when entering edit mode
+  useEffect(() => {
+    if (editMessageId && activeChat) {
+      const msg = messages[draftKey]?.find((m) => m.id === editMessageId)
+      if (msg) {
+        setText(msg.content)
+        if (draftKey) {
+          setDraft(draftKey, msg.content)
+        }
+        return
+      }
+    }
+    setText(savedDraft)
+  }, [draftKey, savedDraft, editMessageId, activeChat, messages, setDraft])
+
+  const handleInput = useCallback((value: string) => {
+    setText(value)
+    if (draftKey) {
+      setDraft(draftKey, value)
+    }
+  }, [draftKey, setDraft])
 
   const handleSubmit = useCallback(() => {
-    if (text.trim()) {
-      onSendMessage(text.trim())
-      setText("")
+    const trimmed = text.trim()
+    if (trimmed) {
+      onSendMessage(trimmed)
     }
-  }, [text, onSendMessage])
+    setText("")
+    if (draftKey) {
+      setDraft(draftKey, "")
+    }
+    if (replyToMessageId) {
+      setReplyToMessageId(null)
+    }
+    if (editMessageId) {
+      setEditMessageId(null)
+    }
+  }, [text, onSendMessage, draftKey, setDraft, replyToMessageId, setReplyToMessageId, editMessageId, setEditMessageId])
+
+  const placeholder = activeChat
+    ? activeThreadId
+      ? `Message #${activeChat.title}`
+      : `Message ${activeChat.title}`
+    : "Message"
+
+  const replyMsg = replyToMessageId && activeChat
+    ? messages[draftKey]?.find((m) => m.id === replyToMessageId)
+    : undefined
+
+  const editMsg = editMessageId && activeChat
+    ? messages[draftKey]?.find((m) => m.id === editMessageId)
+    : undefined
 
   return (
     <box
       style={{
-        height: 1,
+        height: replyMsg || editMsg ? 5 : 3,
         width: "100%",
-        flexDirection: "row",
+        flexDirection: "column",
         backgroundColor: theme.bg,
         border: true,
-        borderStyle: "single",
+        borderStyle: "rounded",
         borderColor: theme.border,
         paddingX: 1,
+        paddingY: 0,
       }}
     >
+      {editMsg ? (
+        <box style={{ flexDirection: "row", height: 1, gap: 1 }}>
+          <text fg={theme.muted}>Editing message:</text>
+          <text fg={theme.accent}>{editMsg.content.slice(0, 40)}</text>
+        </box>
+      ) : replyMsg ? (
+        <box style={{ flexDirection: "row", height: 1, gap: 1 }}>
+          <text fg={theme.muted}>Replying to:</text>
+          <text fg={theme.accent}>{replyMsg.senderName}</text>
+          <text fg={theme.muted}>— {replyMsg.content.slice(0, 40)}</text>
+        </box>
+      ) : null}
       <input
         style={{
           flexGrow: 1,
           backgroundColor: theme.bg,
           textColor: theme.fg,
         }}
-        placeholder="Message #general"
+        placeholder={placeholder}
         value={text}
-        onInput={setText}
+        onInput={handleInput}
         onSubmit={handleSubmit}
         focused={focused}
       />

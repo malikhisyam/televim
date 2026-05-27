@@ -23,10 +23,20 @@ export interface UseTelegramResult {
   submitPhone: (phone: string) => void
   submitCode: (code: string) => void
   submitPassword: (password: string) => void
-  sendMessage: (chatId: number, text: string, threadId?: number) => Promise<Message | null>
+  sendMessage: (chatId: number, text: string, threadId?: number, replyToMessageId?: number) => Promise<Message | null>
   getMessages: (chatId: number, threadId?: number, limit?: number) => Promise<Message[]>
   getOlderMessages: (chatId: number, beforeId: number, threadId?: number, limit?: number) => Promise<Message[]>
   getForumTopics: (chatId: number) => Promise<Thread[]>
+  markAsRead: (chatId: number, threadId?: number) => Promise<void>
+  searchMessages: (chatId: number, query: string, limit?: number) => Promise<Message[]>
+  searchMessagesGlobal: (query: string, limit?: number) => Promise<{ message: Message; chatTitle: string }[]>
+  setCloakMode: (enabled: boolean) => void
+  setLastSeenPrivacy: (level: "nobody" | "contacts" | "anybody") => Promise<void>
+  sendReaction: (chatId: number, messageId: number, emoticon: string) => Promise<void>
+  deleteMessages: (chatId: number, messageIds: number[]) => Promise<void>
+  editMessage: (chatId: number, messageId: number, newText: string) => Promise<void>
+  forwardMessage: (fromChatId: number, toChatId: number, messageId: number) => Promise<void>
+  pinMessage: (chatId: number, messageId: number) => Promise<void>
   disconnect: () => Promise<void>
 }
 
@@ -67,8 +77,35 @@ export function useTelegram(): UseTelegramResult {
   }, [])
 
   const onNewMessage = useCallback((message: Message) => {
-    const key = `${message.chatId}`
+    const state = useStore.getState()
+    const chat = state.chats.find((c) => c.id === message.chatId)
+    // Try replyToTopId first (forum topic id), fall back to replyToMsgId for replies in threads
+    const threadId = message.threadId ?? message.replyToMessageId
+    const isThreadMessage =
+      threadId !== undefined && chat?.threads?.some((t) => t.id === threadId)
+    const key = isThreadMessage ? `${message.chatId}:${threadId}` : `${message.chatId}`
     addMessage(key, message)
+
+    const isActiveChat = state.activeChat?.id === message.chatId
+    const isActiveThread = state.activeThreadId
+      ? state.activeThreadId === threadId
+      : !isThreadMessage
+
+    // In cloak mode, messages are never "read" — always increment unread count
+    // In normal mode, only increment if we're not actively viewing this chat/thread
+    const shouldIncrementUnread = state.cloakMode || !isActiveChat || !isActiveThread
+    if (shouldIncrementUnread) {
+      if (isThreadMessage && threadId !== undefined) {
+        state.incrementThreadUnread(message.chatId, threadId)
+      } else {
+        state.incrementChatUnread(message.chatId)
+      }
+    }
+
+    // Auto-read incoming messages when actively viewing the chat and cloak mode is off
+    if (!state.cloakMode && isActiveChat && isActiveThread) {
+      void clientRef.current?.markAsRead(message.chatId, state.activeThreadId ?? undefined)
+    }
   }, [addMessage])
 
   const onChatListUpdate = useCallback((chats: Chat[]) => {
@@ -82,6 +119,10 @@ export function useTelegram(): UseTelegramResult {
     )
   }, [setChats])
 
+  const onUserStatusChange = useCallback((userId: number, online: boolean, lastSeen?: Date) => {
+    useStore.getState().setUserOnline(userId, online, lastSeen)
+  }, [])
+
   // Create client once and keep it in ref
   if (!clientRef.current) {
     clientRef.current = new TelegramClient({
@@ -89,6 +130,7 @@ export function useTelegram(): UseTelegramResult {
       onStatusChange,
       onNewMessage,
       onChatListUpdate,
+      onUserStatusChange,
     })
   }
 
@@ -125,8 +167,8 @@ export function useTelegram(): UseTelegramResult {
     clientRef.current?.submitPassword(password)
   }, [])
 
-  const sendMessage = useCallback(async (chatId: number, text: string, threadId?: number) => {
-    const result = await clientRef.current?.sendMessage(chatId, text, threadId)
+  const sendMessage = useCallback(async (chatId: number, text: string, threadId?: number, replyToMessageId?: number) => {
+    const result = await clientRef.current?.sendMessage(chatId, text, threadId, replyToMessageId)
     if (result) {
       const key = threadId ? `${chatId}:${threadId}` : `${chatId}`
       addMessage(key, result)
@@ -147,6 +189,48 @@ export function useTelegram(): UseTelegramResult {
   const getForumTopics = useCallback(async (chatId: number) => {
     const topics = await clientRef.current?.getForumTopics(chatId)
     return topics ?? []
+  }, [])
+
+  const markAsRead = useCallback(async (chatId: number, threadId?: number) => {
+    await clientRef.current?.markAsRead(chatId, threadId)
+  }, [])
+
+  const searchMessages = useCallback(async (chatId: number, query: string, limit?: number) => {
+    const msgs = await clientRef.current?.searchMessages(chatId, query, limit)
+    return msgs ?? []
+  }, [])
+
+  const searchMessagesGlobal = useCallback(async (query: string, limit?: number) => {
+    const results = await clientRef.current?.searchMessagesGlobal(query, limit)
+    return results ?? []
+  }, [])
+
+  const setCloakMode = useCallback((enabled: boolean) => {
+    clientRef.current?.setCloakMode(enabled)
+  }, [])
+
+  const setLastSeenPrivacy = useCallback(async (level: "nobody" | "contacts" | "anybody") => {
+    await clientRef.current?.setLastSeenPrivacy(level)
+  }, [])
+
+  const sendReaction = useCallback(async (chatId: number, messageId: number, emoticon: string) => {
+    await clientRef.current?.sendReaction(chatId, messageId, emoticon)
+  }, [])
+
+  const deleteMessages = useCallback(async (chatId: number, messageIds: number[]) => {
+    await clientRef.current?.deleteMessages(chatId, messageIds)
+  }, [])
+
+  const editMessage = useCallback(async (chatId: number, messageId: number, newText: string) => {
+    await clientRef.current?.editMessage(chatId, messageId, newText)
+  }, [])
+
+  const forwardMessage = useCallback(async (fromChatId: number, toChatId: number, messageId: number) => {
+    await clientRef.current?.forwardMessage(fromChatId, toChatId, messageId)
+  }, [])
+
+  const pinMessage = useCallback(async (chatId: number, messageId: number) => {
+    await clientRef.current?.pinMessage(chatId, messageId)
   }, [])
 
   const disconnect = useCallback(async () => {
@@ -172,6 +256,16 @@ export function useTelegram(): UseTelegramResult {
     getMessages,
     getOlderMessages,
     getForumTopics,
+    markAsRead,
+    searchMessages,
+    searchMessagesGlobal,
+    setCloakMode,
+    setLastSeenPrivacy,
+    sendReaction,
+    deleteMessages,
+    editMessage,
+    forwardMessage,
+    pinMessage,
     disconnect,
   }
 }

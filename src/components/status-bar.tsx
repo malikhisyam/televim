@@ -8,9 +8,15 @@ export default function StatusBar() {
   const paneFocus = useStore((s) => s.paneFocus)
   const mode = useStore((s) => s.mode)
   const actionMenuVisible = useStore((s) => s.messageActionMenuVisible)
+  const forwardMessageId = useStore((s) => s.forwardMessageId)
+  const cloakMode = useStore((s) => s.cloakMode)
+  const commandBuffer = useStore((s) => s.commandBuffer)
+  const searchQuery = useStore((s) => s.searchQuery)
 
   let hint = ""
-  if (actionMenuVisible) {
+  if (forwardMessageId) {
+    hint = "FORWARD MODE: j/k select chat • enter forward • esc cancel"
+  } else if (actionMenuVisible) {
     hint = "j/k navigate • enter confirm • esc close • r/y/f/p/e/d/t shortcut"
   } else if (mode === MODES.INSERT) {
     hint = "esc normal mode • enter send"
@@ -21,24 +27,40 @@ export default function StatusBar() {
   } else if (paneFocus === "sidebar") {
     hint = "j/k navigate • enter open/expand • l expand group • h collapse group • esc sidebar • i insert • : command • / search • q quit"
   } else {
-    hint = "j/k scroll messages • a action menu • y copy • d delete • r reply • esc sidebar • i insert • : command • / search • q quit"
+    hint = "j/k scroll messages • a action menu • o open link • s search msg • y copy • d delete • r reply • esc sidebar • i insert • : command • / search • q quit"
   }
+
+  const cloakBadge = cloakMode ? "[CLOAK] " : ""
+
+  // In command/search mode, show the typed buffer so the user knows what they typed
+  const isTyping = mode === MODES.COMMAND || mode === MODES.SEARCH
+  const typedText = mode === MODES.COMMAND ? commandBuffer : searchQuery
 
   return (
     <box
       style={{
-        height: 1,
+        height: 3,
         width: "100%",
         flexDirection: "row",
         backgroundColor: theme.bg,
         border: true,
-        borderStyle: "single",
+        borderStyle: "rounded",
         borderColor: theme.border,
+        paddingX: 1,
+        alignItems: "center",
+        justifyContent: "space-between",
       }}
     >
-      <text fg={theme.muted} style={{ paddingX: 1 }}>
-        {hint}
-      </text>
+      {isTyping ? (
+        <text fg={theme.fg}>{typedText}</text>
+      ) : (
+        <text fg={theme.muted}>
+          {cloakBadge}{hint}
+        </text>
+      )}
+      {mode === MODES.COMMAND ? (
+        <text fg={theme.muted}>type :help for keybindings</text>
+      ) : null}
     </box>
   )
 }

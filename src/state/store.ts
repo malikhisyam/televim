@@ -55,6 +55,26 @@ export interface TeleVimState {
   messageActionMenuIndex: number
   setMessageActionMenuIndex: (index: number | ((prev: number) => number)) => void
 
+  // Reaction picker
+  reactionMenuVisible: boolean
+  setReactionMenuVisible: (visible: boolean) => void
+  reactionMenuIndex: number
+  setReactionMenuIndex: (index: number | ((prev: number) => number)) => void
+
+  // Reply state
+  replyToMessageId: number | null
+  setReplyToMessageId: (id: number | null) => void
+
+  // Edit state
+  editMessageId: number | null
+  setEditMessageId: (id: number | null) => void
+
+  // Forward state
+  forwardMessageId: number | null
+  setForwardMessageId: (id: number | null) => void
+  forwardTargetChatId: number | null
+  setForwardTargetChatId: (id: number | null) => void
+
   // Search
   searchQuery: string
   setSearchQuery: (query: string) => void
@@ -76,6 +96,39 @@ export interface TeleVimState {
   // Input key (force remount input bar)
   inputKey: number
   bumpInputKey: () => void
+
+  // Unread counts
+  incrementChatUnread: (chatId: number) => void
+  resetChatUnread: (chatId: number) => void
+  incrementThreadUnread: (chatId: number, threadId: number) => void
+  resetThreadUnread: (chatId: number, threadId: number) => void
+
+  // Drafts (per chat+thread)
+  drafts: Record<string, string>
+  setDraft: (storeKey: string, text: string) => void
+
+  // Cloak mode (don't send read receipts)
+  cloakMode: boolean
+  toggleCloakMode: () => void
+
+  // User online statuses (private chats only)
+  userStatuses: Record<number, { online: boolean; lastSeen?: Date }>
+  setUserOnline: (userId: number, online: boolean, lastSeen?: Date) => void
+
+  // Message search overlay
+  messageSearchVisible: boolean
+  setMessageSearchVisible: (visible: boolean) => void
+  messageSearchGlobal: boolean
+  setMessageSearchGlobal: (global: boolean) => void
+  messageSearchQuery: string
+  setMessageSearchQuery: (query: string) => void
+  updateMessageSearchQuery: (fn: (prev: string) => string) => void
+  messageSearchResults: Message[]
+  setMessageSearchResults: (results: Message[]) => void
+  messageSearchIndex: number
+  setMessageSearchIndex: (index: number | ((prev: number) => number)) => void
+  messageSearchLoading: boolean
+  setMessageSearchLoading: (loading: boolean) => void
 
   // Help overlay
   helpVisible: boolean
@@ -183,6 +236,28 @@ export const useStore = create<TeleVimState>((set, get) => ({
           : index,
     })),
 
+  reactionMenuVisible: false,
+  setReactionMenuVisible: (visible) => set({ reactionMenuVisible: visible }),
+  reactionMenuIndex: 0,
+  setReactionMenuIndex: (index) =>
+    set((state) => ({
+      reactionMenuIndex:
+        typeof index === "function"
+          ? index(state.reactionMenuIndex)
+          : index,
+    })),
+
+  replyToMessageId: null,
+  setReplyToMessageId: (replyToMessageId) => set({ replyToMessageId }),
+
+  editMessageId: null,
+  setEditMessageId: (editMessageId) => set({ editMessageId }),
+
+  forwardMessageId: null,
+  setForwardMessageId: (forwardMessageId) => set({ forwardMessageId }),
+  forwardTargetChatId: null,
+  setForwardTargetChatId: (forwardTargetChatId) => set({ forwardTargetChatId }),
+
   searchQuery: "",
   setSearchQuery: (searchQuery) => set({ searchQuery }),
   updateSearchQuery: (fn) =>
@@ -210,6 +285,86 @@ export const useStore = create<TeleVimState>((set, get) => ({
 
   inputKey: 0,
   bumpInputKey: () => set((state) => ({ inputKey: state.inputKey + 1 })),
+
+  incrementChatUnread: (chatId) =>
+    set((state) => ({
+      chats: state.chats.map((c) =>
+        c.id === chatId ? { ...c, unreadCount: c.unreadCount + 1 } : c,
+      ),
+    })),
+  resetChatUnread: (chatId) =>
+    set((state) => ({
+      chats: state.chats.map((c) =>
+        c.id === chatId ? { ...c, unreadCount: 0 } : c,
+      ),
+    })),
+  incrementThreadUnread: (chatId, threadId) =>
+    set((state) => ({
+      chats: state.chats.map((c) =>
+        c.id === chatId
+          ? {
+              ...c,
+              threads: c.threads?.map((t) =>
+                t.id === threadId
+                  ? { ...t, unreadCount: t.unreadCount + 1 }
+                  : t,
+              ),
+            }
+          : c,
+      ),
+    })),
+  resetThreadUnread: (chatId, threadId) =>
+    set((state) => ({
+      chats: state.chats.map((c) =>
+        c.id === chatId
+          ? {
+              ...c,
+              threads: c.threads?.map((t) =>
+                t.id === threadId ? { ...t, unreadCount: 0 } : t,
+              ),
+            }
+          : c,
+      ),
+    })),
+
+  drafts: {},
+  setDraft: (storeKey, text) =>
+    set((state) => ({
+      drafts: { ...state.drafts, [storeKey]: text },
+    })),
+
+  cloakMode: false,
+  toggleCloakMode: () => set((state) => ({ cloakMode: !state.cloakMode })),
+
+  userStatuses: {},
+  setUserOnline: (userId, online, lastSeen) =>
+    set((state) => ({
+      userStatuses: {
+        ...state.userStatuses,
+        [userId]: { online, lastSeen: lastSeen ?? state.userStatuses[userId]?.lastSeen },
+      },
+    })),
+
+  messageSearchVisible: false,
+  setMessageSearchVisible: (messageSearchVisible) => set({ messageSearchVisible }),
+  messageSearchGlobal: false,
+  setMessageSearchGlobal: (messageSearchGlobal) => set({ messageSearchGlobal }),
+  messageSearchQuery: "",
+  setMessageSearchQuery: (messageSearchQuery) => set({ messageSearchQuery }),
+  updateMessageSearchQuery: (fn) =>
+    set((state) => ({ messageSearchQuery: fn(state.messageSearchQuery) })),
+  messageSearchResults: [],
+  setMessageSearchResults: (messageSearchResults) => set({ messageSearchResults }),
+  messageSearchIndex: 0,
+  setMessageSearchIndex: (index) =>
+    set((state) => ({
+      messageSearchIndex:
+        typeof index === "function"
+          ? index(state.messageSearchIndex)
+          : index,
+    })),
+  messageSearchLoading: false,
+  setMessageSearchLoading: (messageSearchLoading) => set({ messageSearchLoading }),
 
   helpVisible: false,
   toggleHelp: () => set((state) => ({ helpVisible: !state.helpVisible })),

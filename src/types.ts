@@ -13,6 +13,7 @@ export interface Chat {
   title: string
   type: "private" | "group" | "channel"
   unreadCount: number
+  forum?: boolean
   lastMessage?: Message
   threads?: Thread[]
 }
@@ -25,6 +26,7 @@ export interface Message {
   timestamp: Date
   isOutgoing: boolean
   replyToMessageId?: number
+  threadId?: number
   mediaType?: "photo" | "video" | "file" | "audio" | "voice" | "sticker" | "gif" | "location" | "poll" | "contact" | "unknown"
 }
 

@@ -15,10 +15,10 @@ const ACTIONS = [
 export type ActionKey = (typeof ACTIONS)[number]["key"]
 
 interface MessageActionMenuProps {
-  onAction: (action: ActionKey) => void
+  onAction?: (action: ActionKey) => void
 }
 
-export default function MessageActionMenu({ onAction }: MessageActionMenuProps) {
+export default function MessageActionMenu(_props: MessageActionMenuProps) {
   const theme = useStore((s) => s.theme)
   const selectedIndex = useStore((s) => s.messageActionMenuIndex)
 
@@ -29,7 +29,6 @@ export default function MessageActionMenu({ onAction }: MessageActionMenuProps) 
         top: "30%",
         left: "30%",
         width: "40%",
-        height: "auto",
         flexDirection: "column",
         border: true,
         borderStyle: "rounded",
@@ -52,10 +51,9 @@ export default function MessageActionMenu({ onAction }: MessageActionMenuProps) 
               backgroundColor: isSelected ? theme.accent : theme.bg,
             }}
           >
-            <box style={{ flexDirection: "row", height: 1 }}>
-              <text fg={isSelected ? theme.bg : theme.fg}>{action.label}</text>
-              <text fg={isSelected ? theme.bg : theme.muted}> ({action.shortcut})</text>
-            </box>
+            <text fg={isSelected ? theme.bg : theme.fg}>
+              {action.label} <span fg={isSelected ? theme.bg : theme.muted}>({action.shortcut})</span>
+            </text>
           </box>
         )
       })}

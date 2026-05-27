@@ -7,20 +7,43 @@ import type { Message } from "../types"
 function MessageBubble({
   message,
   isSelected,
+  allMessages,
 }: {
   message: Message
   isSelected: boolean
+  allMessages: Message[]
 }) {
   const theme = useStore((s) => s.theme)
-  const bg = isSelected ? theme.accent : theme.bg
-  const fg = isSelected ? "#ffffff" : theme.fg
-  const align = message.isOutgoing ? "flex-end" : "flex-start"
-  const senderColor = message.isOutgoing ? theme.accent : theme.warning
+  const activeChat = useStore((s) => s.activeChat)
+  const activeThreadId = useStore((s) => s.activeThreadId)
 
-  const timeStr = message.timestamp.toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-  })
+  // Invert colors for selected message so it's always highly visible
+  const bg = isSelected ? theme.fg : theme.bg
+  const fg = isSelected ? theme.bg : theme.fg
+  const align = message.isOutgoing ? "flex-end" : "flex-start"
+  // Differentiate own messages (muted) vs others (bright), but invert when selected
+  const senderColor = isSelected ? theme.bg : message.isOutgoing ? theme.muted : theme.fg
+
+  const d = message.timestamp
+  const timeStr = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+  const dateStr = `${d.getDate()} ${d.toLocaleDateString([], { month: "long" })}`
+  const fullStr = `${timeStr} - ${dateStr}`
+
+  // Build a t.me link for media messages in groups/channels.
+  // Private chats have no public message URLs.
+  // Channel IDs are negative (bot-api style: -100...); t.me/c/ needs the positive ID.
+  const isMedia = message.mediaType && message.mediaType !== "unknown"
+  let messageUrl: string | undefined
+  if (isMedia && activeChat && activeChat.type !== "private") {
+    const rawId = message.chatId
+    const positiveId = rawId < 0 ? rawId * -1 : rawId
+    messageUrl = `https://t.me/c/${positiveId}/${message.id}`
+  }
+
+  // Find the message being replied to
+  const repliedTo = message.replyToMessageId
+    ? allMessages.find((m) => m.id === message.replyToMessageId)
+    : undefined
 
   return (
     <box
@@ -34,27 +57,75 @@ function MessageBubble({
       }}
     >
       <box style={{ flexDirection: "column", padding: 1, gap: 0 }}>
+        {repliedTo ? (
+          <box style={{ flexDirection: "row", gap: 0, marginBottom: 0 }}>
+            <box style={{ width: 1, height: 2, backgroundColor: theme.accent }} />
+            <box style={{ flexDirection: "column", paddingLeft: 1 }}>
+              <text fg={isSelected ? theme.bg : theme.accent}>
+                {repliedTo.senderName}
+              </text>
+              <text fg={isSelected ? theme.bg : theme.muted}>
+                {repliedTo.content.slice(0, 50)}
+              </text>
+            </box>
+          </box>
+        ) : null}
         <text fg={senderColor}>
-          {message.senderName} {timeStr}
+          {message.senderName} {fullStr}
         </text>
-        <text fg={fg}>{message.content}</text>
+        {messageUrl ? (
+          <text fg={fg}>
+            <a href={messageUrl}><u>{message.content}</u></a>
+          </text>
+        ) : (
+          <text fg={fg}>{message.content}</text>
+        )}
       </box>
     </box>
   )
 }
 
-const MemoMessageBubble = memo(MessageBubble)
+const MemoMessageBubble = memo(MessageBubble, (prev, next) => {
+  return (
+    prev.message.id === next.message.id &&
+    prev.isSelected === next.isSelected &&
+    prev.allMessages.length === next.allMessages.length
+  )
+})
+
+const SCROLLBAR_OPTS = {
+  showArrows: false,
+  trackOptions: {
+    foregroundColor: "#a0a0a0",
+    backgroundColor: "#404040",
+  },
+}
 
 export default function ChatView() {
   const theme = useStore((s) => s.theme)
   const activeChat = useStore((s) => s.activeChat)
+  const activeThreadId = useStore((s) => s.activeThreadId)
   const messages = useStore((s) => s.messages)
   const selectedMessageIndex = useStore((s) => s.selectedMessageIndex)
   const scrollboxRef = useRef<any>(null)
 
-  const activeThreadId = useStore((s) => s.activeThreadId)
   const activeMessages = activeChat ? messages[`${activeChat.id}${activeThreadId ? `:${activeThreadId}` : ""}`] ?? [] : []
   const isLoadingOlder = useStore((s) => s.isLoadingOlderMessages)
+
+  // Build title: "Group > Thread" when in a thread
+  let title = activeChat ? activeChat.title : "Messages"
+  if (activeChat && activeThreadId) {
+    const thread = activeChat.threads?.find((t) => t.id === activeThreadId)
+    if (thread) {
+      title = `${activeChat.title} > ${thread.title}`
+    }
+  }
+
+  // Online indicator for private chats
+  const userStatuses = useStore((s) => s.userStatuses)
+  const isPrivate = activeChat?.type === "private"
+  const userStatus = isPrivate && activeChat ? userStatuses[activeChat.id] : undefined
+  const onlineIndicator = userStatus?.online ? " ●" : ""
 
   // Auto-scroll to keep the selected message in view
   useEffect(() => {
@@ -84,7 +155,7 @@ export default function ChatView() {
         borderColor: theme.border,
         backgroundColor: theme.bg,
       }}
-      title={activeChat ? activeChat.title : "Messages"}
+      title={`${title}${onlineIndicator}`}
       titleAlignment="left"
     >
       {activeChat ? (
@@ -97,9 +168,9 @@ export default function ChatView() {
             scrollY: true,
             stickyScroll: true,
             stickyStart: "bottom",
-            viewportCulling: true,
             backgroundColor: theme.bg,
           }}
+          scrollbarOptions={SCROLLBAR_OPTS}
         >
           {isLoadingOlder ? (
             <box style={{ width: "100%", paddingY: 1, justifyContent: "center" }}>
@@ -123,6 +194,7 @@ export default function ChatView() {
                 key={message.id}
                 message={message}
                 isSelected={index === selectedMessageIndex}
+                allMessages={activeMessages}
               />
             ))
           )}

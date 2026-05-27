@@ -37,7 +37,11 @@ export default function HelpOverlay() {
           <text fg={theme.fg}>i            Enter Insert mode</text>
           <text fg={theme.fg}>v            Enter Visual mode</text>
           <text fg={theme.fg}>:            Enter Command mode</text>
-          <text fg={theme.fg}>/            Enter Search mode</text>
+          <text fg={theme.fg}>/            Search chats</text>
+          <text fg={theme.fg}>s            Search messages (tab/shift+tab nav)</text>
+          <text fg={theme.fg}>S            Global search all chats</text>
+          <text fg={theme.fg}>a            Message action menu (react, copy, delete, etc.)</text>
+          <text fg={theme.fg}>o            Open media link</text>
           <text fg={theme.fg}>yy           Copy message</text>
           <text fg={theme.fg}>dd           Delete message</text>
           <text fg={theme.fg}>r            Reply to message</text>
@@ -62,13 +66,16 @@ export default function HelpOverlay() {
           <text fg={theme.fg}>Esc          Cancel</text>
 
           <box style={{ height: 1 }} />
-          <text fg={theme.warning}>COMMAND / SEARCH</text>
+          <text fg={theme.warning}>COMMANDS</text>
           <box style={{ height: 1 }} />
           <text fg={theme.fg}>:q           Quit</text>
-          <text fg={theme.fg}>:join        Join channel</text>
+          <text fg={theme.fg}>:cloak       Toggle privacy mode</text>
+          <text fg={theme.fg}>:privacy     nobody / contacts / anybody</text>
+          <text fg={theme.fg}>:theme       Cycle color theme</text>
           <text fg={theme.fg}>:leave       Leave chat</text>
-          <text fg={theme.fg}>Enter        Execute / Select</text>
-          <text fg={theme.fg}>Esc          Cancel</text>
+          <text fg={theme.fg}>:search      Search messages in chat</text>
+          <text fg={theme.fg}>:searchglobal Search all chats</text>
+          <text fg={theme.fg}>:help        Show this help</text>
         </box>
       </box>
     </box>
