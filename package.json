@@ -1,0 +1,23 @@
+{
+  "name": "televim",
+  "module": "src/main.tsx",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "bun run src/main.tsx",
+    "dev": "bun run --watch src/main.tsx"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/react": "^19.0.0",
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@opentui/core": "^0.2.15",
+    "@opentui/react": "^0.2.15",
+    "qrcode": "^1.5.4",
+    "react": "^19.2.6",
+    "telegram": "^2.26.22",
+    "zustand": "^5.0.13"
+  }
+}
