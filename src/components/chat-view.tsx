@@ -70,6 +70,11 @@ function MessageBubble({
             </box>
           </box>
         ) : null}
+        {message.isForwarded ? (
+          <text fg={isSelected ? theme.bg : theme.muted}>
+            Forwarded from {message.forwardFromName || "Unknown"}
+          </text>
+        ) : null}
         <text fg={senderColor}>
           {message.senderName} {fullStr}
         </text>
@@ -123,9 +128,11 @@ export default function ChatView() {
 
   // Online indicator for private chats
   const userStatuses = useStore((s) => s.userStatuses)
+  const pinnedMessages = useStore((s) => s.pinnedMessages)
   const isPrivate = activeChat?.type === "private"
   const userStatus = isPrivate && activeChat ? userStatuses[activeChat.id] : undefined
   const onlineIndicator = userStatus?.online ? " ●" : ""
+  const pinnedMsg = activeChat ? pinnedMessages[activeChat.id] : undefined
 
   // Auto-scroll to keep the selected message in view
   useEffect(() => {
@@ -172,6 +179,21 @@ export default function ChatView() {
           }}
           scrollbarOptions={SCROLLBAR_OPTS}
         >
+          {pinnedMsg ? (
+            <box
+              style={{
+                width: "100%",
+                paddingX: 1,
+                paddingY: 0,
+                height: 2,
+                backgroundColor: theme.border,
+                flexDirection: "column",
+              }}
+            >
+              <text fg={theme.accent}>📌 Pinned: {pinnedMsg.senderName}</text>
+              <text fg={theme.fg}>{pinnedMsg.content.slice(0, 60)}</text>
+            </box>
+          ) : null}
           {isLoadingOlder ? (
             <box style={{ width: "100%", paddingY: 1, justifyContent: "center" }}>
               <text fg={theme.muted}>Loading older messages...</text>

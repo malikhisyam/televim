@@ -26,8 +26,7 @@ export default function InputBar({ onSendMessage, focused }: InputBarProps) {
 
   const [text, setText] = useState(savedDraft)
 
-  // Sync local text when switching chats or when draft changes externally
-  // Also prefill with message text when entering edit mode
+  // Prefill with message text when entering edit mode (runs only when editMessageId changes)
   useEffect(() => {
     if (editMessageId && activeChat) {
       const msg = messages[draftKey]?.find((m) => m.id === editMessageId)
@@ -36,11 +35,16 @@ export default function InputBar({ onSendMessage, focused }: InputBarProps) {
         if (draftKey) {
           setDraft(draftKey, msg.content)
         }
-        return
       }
     }
-    setText(savedDraft)
-  }, [draftKey, savedDraft, editMessageId, activeChat, messages, setDraft])
+  }, [editMessageId])
+
+  // Sync local text when switching chats or when draft changes externally (only when NOT editing)
+  useEffect(() => {
+    if (!editMessageId) {
+      setText(savedDraft)
+    }
+  }, [draftKey, savedDraft, editMessageId])
 
   const handleInput = useCallback((value: string) => {
     setText(value)

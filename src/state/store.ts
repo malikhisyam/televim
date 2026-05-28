@@ -40,6 +40,7 @@ export interface TeleVimState {
   addMessage: (storeKey: string, message: Message) => void
   prependMessages: (storeKey: string, messages: Message[]) => void
   deleteMessage: (storeKey: string, messageIndex: number) => void
+  updateMessageContent: (storeKey: string, messageId: number, newContent: string) => void
 
   // Pagination
   isLoadingOlderMessages: boolean
@@ -74,6 +75,10 @@ export interface TeleVimState {
   setForwardMessageId: (id: number | null) => void
   forwardTargetChatId: number | null
   setForwardTargetChatId: (id: number | null) => void
+
+  // Pinned messages
+  pinnedMessages: Record<number, Message>
+  setPinnedMessage: (chatId: number, message: Message | null) => void
 
   // Search
   searchQuery: string
@@ -216,6 +221,17 @@ export const useStore = create<TeleVimState>((set, get) => ({
       }
     }),
 
+  updateMessageContent: (storeKey, messageId, newContent) =>
+    set((state) => {
+      const chatMessages = state.messages[storeKey] ?? []
+      const updated = chatMessages.map((m) =>
+        m.id === messageId ? { ...m, content: newContent } : m,
+      )
+      return {
+        messages: { ...state.messages, [storeKey]: updated },
+      }
+    }),
+
   selectedMessageIndex: 0,
   setSelectedMessageIndex: (index) =>
     set((state) => ({
@@ -257,6 +273,14 @@ export const useStore = create<TeleVimState>((set, get) => ({
   setForwardMessageId: (forwardMessageId) => set({ forwardMessageId }),
   forwardTargetChatId: null,
   setForwardTargetChatId: (forwardTargetChatId) => set({ forwardTargetChatId }),
+
+  pinnedMessages: {} as Record<number, Message>,
+  setPinnedMessage: (chatId: number, message: Message | null) =>
+    set((state) => ({
+      pinnedMessages: message
+        ? { ...state.pinnedMessages, [chatId]: message }
+        : Object.fromEntries(Object.entries(state.pinnedMessages).filter(([k]) => Number(k) !== chatId)),
+    })),
 
   searchQuery: "",
   setSearchQuery: (searchQuery) => set({ searchQuery }),

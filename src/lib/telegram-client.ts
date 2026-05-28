@@ -858,6 +858,23 @@ function mapGramMessage(msg: any, chatId: number): Message {
     : replyTo?.replyToTopId
       ? Number(replyTo.replyToTopId)
       : undefined
+
+  // Detect forwarded messages
+  const fwdFrom = msg.fwdFrom
+  const isForwarded = !!fwdFrom
+  let forwardFromName: string | undefined
+  if (fwdFrom) {
+    const fromName = fwdFrom.fromName
+    const sender = fwdFrom.fromId
+    if (fromName) {
+      forwardFromName = fromName
+    } else if (sender?.userId) {
+      forwardFromName = fwdFrom.fromName || "Unknown"
+    } else if (sender?.channelId) {
+      forwardFromName = fwdFrom.channelTitle || fwdFrom.fromName || "Unknown Channel"
+    }
+  }
+
   return {
     id,
     chatId,
@@ -868,6 +885,8 @@ function mapGramMessage(msg: any, chatId: number): Message {
     mediaType,
     replyToMessageId,
     threadId,
+    isForwarded,
+    forwardFromName,
   }
 }
 

@@ -88,6 +88,13 @@ function MainApp() {
     if (!activeChat) return
     if (editMessageId) {
       void telegram.editMessage(activeChat.id, editMessageId, text)
+      const storeKey = msgStoreKey(activeChat.id, activeThreadId)
+      state.updateMessageContent(storeKey, editMessageId, text)
+      // Also update pinned message if it was the one edited
+      const pinned = state.pinnedMessages[activeChat.id]
+      if (pinned && pinned.id === editMessageId) {
+        state.setPinnedMessage(activeChat.id, { ...pinned, content: text })
+      }
       setEditMessageId(null)
     } else {
       void telegram.sendMessage(activeChat.id, text, activeThreadId ?? undefined, replyToMessageId ?? undefined).then(() => {
@@ -277,10 +284,11 @@ function MainApp() {
           state.setPaneFocus("sidebar")
         }
       } else if (action === "pin") {
-        const { messages, selectedMessageIndex } = state
+        const { messages, selectedMessageIndex, setPinnedMessage } = state
         const msg = messages[storeKey]?.[selectedMessageIndex]
         if (msg) {
           void telegram.pinMessage(activeChat.id, msg.id)
+          setPinnedMessage(activeChat.id, msg)
         }
       } else if (action === "edit") {
         const { messages, selectedMessageIndex, setEditMessageId } = state

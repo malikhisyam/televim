@@ -27,6 +27,8 @@ export interface Message {
   isOutgoing: boolean
   replyToMessageId?: number
   threadId?: number
+  isForwarded?: boolean
+  forwardFromName?: string
   mediaType?: "photo" | "video" | "file" | "audio" | "voice" | "sticker" | "gif" | "location" | "poll" | "contact" | "unknown"
 }
 
