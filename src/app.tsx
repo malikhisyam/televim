@@ -13,7 +13,7 @@ import { useVimMode } from "./hooks/use-vim-mode"
 import { msgStoreKey } from "./lib/message-store"
 import { loadCloakMode, saveCloakMode } from "./lib/config"
 import { pasteClipboardImage } from "./lib/clipboard-image"
-import { setNotificationRenderer } from "./lib/notifications"
+import { setNotificationRenderer, downloadTelegramIcon } from "./lib/notifications"
 import { loadNotificationsEnabled, saveNotificationsEnabled } from "./lib/notification-store"
 
 function openUrl(url: string): void {
@@ -115,6 +115,8 @@ function MainApp() {
   const renderer = useRenderer()
   useEffect(() => {
     setNotificationRenderer(renderer)
+    // Download Telegram logo for notifications (best-effort, ignore errors)
+    void downloadTelegramIcon()
   }, [renderer])
 
   const handleSendMessage = useCallback((text: string) => {
