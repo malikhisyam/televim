@@ -9,6 +9,8 @@ import { getVisibleItems } from "../lib/chat-list-utils"
 import { parseKey, resetKeymapState, createKeymapState } from "../lib/keymap-engine"
 
 export interface UseVimModeOptions {
+  /** If false, the keyboard handler will ignore all keys (useful when auth screen is active) */
+  enabled?: boolean
   /** Open the currently selected chat (or thread), optionally jumping to a specific message */
   onOpenChat?: (chatId: number, threadId?: number, targetMessageId?: number) => void
   /** A group was expanded (fetch threads here) */
@@ -29,6 +31,10 @@ export interface UseVimModeOptions {
   onReact?: (emoticon: string) => void
   /** Forward the selected message to a target chat */
   onForwardMessage?: (toChatId: number, messageId: number) => void
+  /** Attach current draft as a file */
+  onAttachFile?: () => void
+  /** Paste clipboard image as an attachment */
+  onPasteImage?: () => void | Promise<void>
   /** Execute a colon command (string includes the colon) */
   onCommand?: (command: string) => void
   /** Execute a search query */
@@ -53,8 +59,10 @@ export function useVimMode(options: UseVimModeOptions = {}) {
 
   useKeyboard(
     useCallback(async (key) => {
-      const state = useStore.getState()
       const opts = optionsRef.current
+      if (opts.enabled === false) return
+
+      const state = useStore.getState()
 
       // Normalize shifted single-letter keys so Shift+g → "G"
       const keyName =
@@ -276,6 +284,10 @@ export function useVimMode(options: UseVimModeOptions = {}) {
       // ── GLOBAL: Escape always returns to Normal + sidebar focus ──
       if (keyName === "escape") {
         consume()
+        if (state.attachmentPath) {
+          state.setAttachmentPath(null)
+          return
+        }
         if (state.forwardMessageId) {
           state.setForwardMessageId(null)
           state.setPaneFocus("messages")
@@ -288,12 +300,23 @@ export function useVimMode(options: UseVimModeOptions = {}) {
 
       // ── INSERT mode ──
       if (state.mode === MODES.INSERT) {
-        // Only intercept Escape; let all other keys pass to the focused input
         if (keyName === "escape") {
           consume()
           state.resetToNormal()
+          return
         }
+      if (key.ctrl && keyName === "o") {
+        consume()
+        opts.onAttachFile?.()
         return
+      }
+      if (key.ctrl && keyName === "v") {
+        consume()
+        void opts.onPasteImage?.()
+        return
+      }
+      // Let all other keys pass to the focused input
+      return
       }
 
       // ── VISUAL mode ──
@@ -662,6 +685,12 @@ export function useVimMode(options: UseVimModeOptions = {}) {
           opts.onOpenLink?.()
           return
         }
+      }
+
+      if (key.ctrl && keyName === "o") {
+        consume()
+        opts.onAttachFile?.()
+        return
       }
 
       if (keyName === "q") {

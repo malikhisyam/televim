@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useRef } from "react"
 import { spawn } from "child_process"
+import { existsSync } from "fs"
+import { usePaste } from "@opentui/react"
+import { decodePasteBytes } from "@opentui/core"
 import { MODES } from "./constants"
 import { useStore } from "./state/store"
 import { useTheme } from "./hooks/use-theme"
@@ -9,6 +12,7 @@ import { useTelegram } from "./hooks/use-telegram"
 import { useVimMode } from "./hooks/use-vim-mode"
 import { msgStoreKey } from "./lib/message-store"
 import { loadCloakMode, saveCloakMode } from "./lib/config"
+import { pasteClipboardImage } from "./lib/clipboard-image"
 
 function openUrl(url: string): void {
   const platform = process.platform
@@ -84,8 +88,23 @@ function MainApp() {
 
   const handleSendMessage = useCallback((text: string) => {
     const state = useStore.getState()
-    const { activeChat, activeThreadId, bumpInputKey, replyToMessageId, setReplyToMessageId, editMessageId, setEditMessageId } = state
+    const { activeChat, activeThreadId, bumpInputKey, replyToMessageId, setReplyToMessageId, editMessageId, setEditMessageId, attachmentPath, setAttachmentPath } = state
     if (!activeChat) return
+
+    if (attachmentPath) {
+      void telegram.sendFile(activeChat.id, attachmentPath, text.trim() || undefined, activeThreadId ?? undefined, replyToMessageId ?? undefined).then(() => {
+        setAttachmentPath(null)
+        if (state.cloakMode) {
+          telegram.setCloakMode(true)
+        }
+      })
+      if (replyToMessageId) {
+        setReplyToMessageId(null)
+      }
+      bumpInputKey()
+      return
+    }
+
     if (editMessageId) {
       void telegram.editMessage(activeChat.id, editMessageId, text)
       const storeKey = msgStoreKey(activeChat.id, activeThreadId)
@@ -122,7 +141,10 @@ function MainApp() {
     }
   }, [telegram])
 
+  const isAuthScreen = telegram.needsAuth || telegram.status === "error" || telegram.status === "connecting"
+
   useVimMode({
+    enabled: !isAuthScreen,
     onOpenChat: useCallback((chatId: number, threadId?: number, targetMessageId?: number) => {
       const state = useStore.getState()
       const chat = state.chats.find((c) => c.id === chatId)
@@ -379,6 +401,19 @@ function MainApp() {
             state.setMessageSearchIndex(0)
           })
         }
+      } else if (command.startsWith(":attach ")) {
+        const path = command.slice(7).trim()
+        if (path) {
+          const resolved = path.startsWith("~") ? path.replace("~", process.env.HOME || "~") : path
+          if (existsSync(resolved)) {
+            useStore.getState().setAttachmentPath(resolved)
+          }
+        }
+      } else if (command === ":pasteimage") {
+        const path = pasteClipboardImage()
+        if (path) {
+          useStore.getState().setAttachmentPath(path)
+        }
       }
     }, [cycleTheme, telegram]),
 
@@ -423,10 +458,52 @@ function MainApp() {
       void telegram.forwardMessage(fromChat.id, toChatId, messageId)
     }, [telegram]),
 
+    onAttachFile: useCallback(() => {
+      const state = useStore.getState()
+      const { activeChat, activeThreadId, drafts, setAttachmentPath } = state
+      if (!activeChat) return
+      const draftKey = msgStoreKey(activeChat.id, activeThreadId)
+      const draft = drafts[draftKey] ?? ""
+      const trimmed = draft.trim()
+      if (!trimmed) return
+      const resolved = trimmed.startsWith("~") ? trimmed.replace("~", process.env.HOME || "~") : trimmed
+      if (existsSync(resolved)) {
+        setAttachmentPath(resolved)
+        state.setDraft(draftKey, "")
+        state.bumpInputKey()
+      }
+    }, []),
+
+    onPasteImage: useCallback(() => {
+      const state = useStore.getState()
+      const { activeChat, setAttachmentPath } = state
+      if (!activeChat) return
+      const path = pasteClipboardImage()
+      if (path) {
+        setAttachmentPath(path)
+      }
+    }, []),
+
     onQuit: useCallback(async () => {
       await telegram.disconnect()
       cleanupAndExit(0)
     }, [telegram]),
+  })
+
+  // Detect file-path paste (terminal drag-and-drop often pastes the path)
+  usePaste((event) => {
+    const raw = decodePasteBytes(event.bytes).trim().replace(/^["']|["']$/g, "")
+    if (!raw || raw.includes("\n")) return
+    const resolved = raw.startsWith("~") ? raw.replace("~", process.env.HOME || "~") : raw
+    if (existsSync(resolved)) {
+      const state = useStore.getState()
+      state.setAttachmentPath(resolved)
+      if (state.activeChat) {
+        const draftKey = msgStoreKey(state.activeChat.id, state.activeThreadId)
+        state.setDraft(draftKey, "")
+        state.bumpInputKey()
+      }
+    }
   })
 
   const isInsert = mode === MODES.INSERT
