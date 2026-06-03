@@ -121,6 +121,11 @@ export interface TeleVimState {
   userStatuses: Record<number, { online: boolean; lastSeen?: Date }>
   setUserOnline: (userId: number, online: boolean, lastSeen?: Date) => void
 
+  // Typing indicators (chatId -> { userId, name, timeout })
+  typingUsers: Record<number, { userId: number; name: string; until: number }>
+  setUserTyping: (chatId: number, userId: number, name: string) => void
+  clearUserTyping: (chatId: number) => void
+
   // Message search overlay
   messageSearchVisible: boolean
   setMessageSearchVisible: (visible: boolean) => void
@@ -379,6 +384,21 @@ export const useStore = create<TeleVimState>((set, get) => ({
         [userId]: { online, lastSeen: lastSeen ?? state.userStatuses[userId]?.lastSeen },
       },
     })),
+
+  typingUsers: {},
+  setUserTyping: (chatId, userId, name) =>
+    set((state) => ({
+      typingUsers: {
+        ...state.typingUsers,
+        [chatId]: { userId, name, until: Date.now() + 6000 },
+      },
+    })),
+  clearUserTyping: (chatId) =>
+    set((state) => {
+      const next = { ...state.typingUsers }
+      delete next[chatId]
+      return { typingUsers: next }
+    }),
 
   messageSearchVisible: false,
   setMessageSearchVisible: (messageSearchVisible) => set({ messageSearchVisible }),

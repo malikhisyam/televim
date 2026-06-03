@@ -86,6 +86,21 @@ function MainApp() {
     }
   }, [])
 
+  // Auto-clear expired typing indicators every second
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const state = useStore.getState()
+      const now = Date.now()
+      const expired = Object.entries(state.typingUsers).filter(
+        ([, data]) => data.until < now,
+      )
+      for (const [chatId] of expired) {
+        state.clearUserTyping(Number(chatId))
+      }
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [])
+
   const handleSendMessage = useCallback((text: string) => {
     const state = useStore.getState()
     const { activeChat, activeThreadId, bumpInputKey, replyToMessageId, setReplyToMessageId, editMessageId, setEditMessageId, attachmentPath, setAttachmentPath } = state

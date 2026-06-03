@@ -34,6 +34,8 @@ export interface TelegramClientOptions {
   onUserStatusChange?: (userId: number, online: boolean, lastSeen?: Date) => void
   /** Called when outgoing messages are read by the recipient (read receipt) */
   onReadOutboxUpdate?: (chatId: number, maxId: number) => void
+  /** Called when a user starts/stops typing in a chat */
+  onTypingUpdate?: (chatId: number, userId: number, isTyping: boolean) => void
   /** Called when the session string should be persisted */
   onSaveSession?: (session: string) => void
 }
@@ -768,6 +770,26 @@ export class TelegramClient {
         const maxId = u.maxId ? Number(u.maxId) : 0
         if (channelId && maxId > 0) {
           this.options.onReadOutboxUpdate?.(channelId, maxId)
+        }
+      }
+    })
+
+    // Listen for typing indicators
+    this.gramClient.addEventHandler((update) => {
+      const u = update as any
+      if (u.className === "UpdateUserTyping") {
+        const userId = Number(u.userId)
+        const chatId = userId // For private chats, the "chat" is the user
+        const action = u.action
+        const isTyping = action && action.className !== "SendMessageCancelAction"
+        this.options.onTypingUpdate?.(chatId, userId, isTyping)
+      } else if (u.className === "UpdateChannelUserTyping") {
+        const channelId = Number(u.channelId)
+        const userId = Number(u.fromId?.userId || 0)
+        const action = u.action
+        const isTyping = action && action.className !== "SendMessageCancelAction"
+        if (userId) {
+          this.options.onTypingUpdate?.(channelId, userId, isTyping)
         }
       }
     })

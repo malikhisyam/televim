@@ -33,8 +33,14 @@ export default function StatusBar() {
   const cloakBadge = cloakMode ? "[CLOAK] " : ""
 
   // In command/search mode, show the typed buffer so the user knows what they typed
-  const isTyping = mode === MODES.COMMAND || mode === MODES.SEARCH
+  const isTypingCommand = mode === MODES.COMMAND || mode === MODES.SEARCH
   const typedText = mode === MODES.COMMAND ? commandBuffer : searchQuery
+
+  // Typing indicator for active chat
+  const activeChat = useStore((s) => s.activeChat)
+  const typingUsers = useStore((s) => s.typingUsers)
+  const activeTyping = activeChat ? typingUsers[activeChat.id] : undefined
+  const typingText = activeTyping ? `${activeTyping.name} is typing...` : ""
 
   return (
     <box
@@ -51,14 +57,16 @@ export default function StatusBar() {
         justifyContent: "space-between",
       }}
     >
-      {isTyping ? (
+      {isTypingCommand ? (
         <text fg={theme.fg}>{typedText}</text>
       ) : (
         <text fg={theme.muted}>
           {cloakBadge}{hint}
         </text>
       )}
-      {mode === MODES.COMMAND ? (
+      {typingText ? (
+        <text fg={theme.accent}>{typingText}</text>
+      ) : mode === MODES.COMMAND ? (
         <text fg={theme.muted}>type :help for keybindings</text>
       ) : null}
     </box>

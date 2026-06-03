@@ -143,6 +143,17 @@ export function useTelegram(): UseTelegramResult {
     useStore.getState().setUserOnline(userId, online, lastSeen)
   }, [])
 
+  const onTypingUpdate = useCallback((chatId: number, userId: number, isTyping: boolean) => {
+    const state = useStore.getState()
+    const chat = state.chats.find((c) => c.id === chatId)
+    const userName = chat?.title || "Someone"
+    if (isTyping) {
+      state.setUserTyping(chatId, userId, userName)
+    } else {
+      state.clearUserTyping(chatId)
+    }
+  }, [])
+
   const onReadOutboxUpdate = useCallback((chatId: number, maxId: number) => {
     setReadOutboxMaxId(chatId, maxId)
   }, [setReadOutboxMaxId])
@@ -179,6 +190,7 @@ export function useTelegram(): UseTelegramResult {
           onChatListUpdate,
           onUserStatusChange,
           onReadOutboxUpdate,
+          onTypingUpdate,
           onSaveSession: (sess) => saveSession(activeAccount, sess),
         },
         sessionString,
@@ -200,7 +212,7 @@ export function useTelegram(): UseTelegramResult {
       clientRef.current = null
       connectingRef.current = false
     }
-  }, [activeAccount, config, onStatusChange, onNewMessage, onChatListUpdate, onUserStatusChange, onReadOutboxUpdate])
+  }, [activeAccount, config, onStatusChange, onNewMessage, onChatListUpdate, onUserStatusChange, onReadOutboxUpdate, onTypingUpdate])
 
   const switchAccount = useCallback((name: string) => {
     const cfg = loadConfig()
