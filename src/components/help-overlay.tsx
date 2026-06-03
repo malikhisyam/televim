@@ -73,6 +73,7 @@ export default function HelpOverlay() {
           <box style={{ height: 1 }} />
           <text fg={theme.fg}>:q           Quit</text>
           <text fg={theme.fg}>:cloak       Toggle privacy mode</text>
+          <text fg={theme.fg}>:notify      Toggle desktop notifications</text>
           <text fg={theme.fg}>:privacy     nobody / contacts / anybody</text>
           <text fg={theme.fg}>:theme       Cycle color theme</text>
           <text fg={theme.fg}>:leave       Leave chat</text>

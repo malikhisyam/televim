@@ -13,7 +13,8 @@ import { useVimMode } from "./hooks/use-vim-mode"
 import { msgStoreKey } from "./lib/message-store"
 import { loadCloakMode, saveCloakMode } from "./lib/config"
 import { pasteClipboardImage } from "./lib/clipboard-image"
-import { setNotificationRenderer, sendNotification } from "./lib/notifications"
+import { setNotificationRenderer } from "./lib/notifications"
+import { loadNotificationsEnabled, saveNotificationsEnabled } from "./lib/notification-store"
 
 function openUrl(url: string): void {
   const platform = process.platform
@@ -84,6 +85,14 @@ function MainApp() {
     if (saved) {
       useStore.getState().toggleCloakMode()
       telegram.setCloakMode(true)
+    }
+  }, [])
+
+  // Load persisted notification setting on mount
+  useEffect(() => {
+    const saved = loadNotificationsEnabled()
+    if (!saved) {
+      useStore.getState().toggleNotifications()
     }
   }, [])
 
@@ -399,6 +408,11 @@ function MainApp() {
             state.resetChatUnread(activeChat.id)
           }
         }
+      } else if (command === ":notify") {
+        const state = useStore.getState()
+        const next = !state.notificationsEnabled
+        state.toggleNotifications()
+        saveNotificationsEnabled(next)
       } else if (command === ":help") {
         useStore.getState().toggleHelp()
       } else if (command.startsWith(":privacy ")) {
