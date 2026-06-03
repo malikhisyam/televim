@@ -139,6 +139,14 @@ export interface TeleVimState {
   helpVisible: boolean
   toggleHelp: () => void
 
+  // Attachment
+  attachmentPath: string | null
+  setAttachmentPath: (path: string | null) => void
+
+  // Read receipts (outgoing messages read by recipient)
+  readOutboxMaxId: Record<number, number>
+  setReadOutboxMaxId: (chatId: number, maxId: number) => void
+
   // Reset helpers
   resetToNormal: () => void
 }
@@ -389,6 +397,15 @@ export const useStore = create<TeleVimState>((set, get) => ({
     })),
   messageSearchLoading: false,
   setMessageSearchLoading: (messageSearchLoading) => set({ messageSearchLoading }),
+
+  attachmentPath: null,
+  setAttachmentPath: (attachmentPath) => set({ attachmentPath }),
+
+  readOutboxMaxId: {},
+  setReadOutboxMaxId: (chatId, maxId) =>
+    set((state) => ({
+      readOutboxMaxId: { ...state.readOutboxMaxId, [chatId]: maxId },
+    })),
 
   helpVisible: false,
   toggleHelp: () => set((state) => ({ helpVisible: !state.helpVisible })),

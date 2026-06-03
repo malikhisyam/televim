@@ -23,6 +23,7 @@ export default function InputBar({ onSendMessage, focused }: InputBarProps) {
 
   const draftKey = activeChat ? msgStoreKey(activeChat.id, activeThreadId) : ""
   const savedDraft = drafts[draftKey] ?? ""
+  const attachmentPath = useStore((s) => s.attachmentPath)
 
   const [text, setText] = useState(savedDraft)
 
@@ -55,7 +56,7 @@ export default function InputBar({ onSendMessage, focused }: InputBarProps) {
 
   const handleSubmit = useCallback(() => {
     const trimmed = text.trim()
-    if (trimmed) {
+    if (trimmed || attachmentPath) {
       onSendMessage(trimmed)
     }
     setText("")
@@ -68,13 +69,15 @@ export default function InputBar({ onSendMessage, focused }: InputBarProps) {
     if (editMessageId) {
       setEditMessageId(null)
     }
-  }, [text, onSendMessage, draftKey, setDraft, replyToMessageId, setReplyToMessageId, editMessageId, setEditMessageId])
+  }, [text, onSendMessage, draftKey, setDraft, replyToMessageId, setReplyToMessageId, editMessageId, setEditMessageId, attachmentPath])
 
-  const placeholder = activeChat
-    ? activeThreadId
-      ? `Message #${activeChat.title}`
-      : `Message ${activeChat.title}`
-    : "Message"
+  const placeholder = attachmentPath
+    ? "Add a caption..."
+    : activeChat
+      ? activeThreadId
+        ? `Message #${activeChat.title}`
+        : `Message ${activeChat.title}`
+      : "Message"
 
   const replyMsg = replyToMessageId && activeChat
     ? messages[draftKey]?.find((m) => m.id === replyToMessageId)
@@ -84,10 +87,12 @@ export default function InputBar({ onSendMessage, focused }: InputBarProps) {
     ? messages[draftKey]?.find((m) => m.id === editMessageId)
     : undefined
 
+  const metaVisible = editMsg || replyMsg || attachmentPath
+
   return (
     <box
       style={{
-        height: replyMsg || editMsg ? 5 : 3,
+        height: metaVisible ? 5 : 3,
         width: "100%",
         flexDirection: "column",
         backgroundColor: theme.bg,
@@ -108,6 +113,11 @@ export default function InputBar({ onSendMessage, focused }: InputBarProps) {
           <text fg={theme.muted}>Replying to:</text>
           <text fg={theme.accent}>{replyMsg.senderName}</text>
           <text fg={theme.muted}>— {replyMsg.content.slice(0, 40)}</text>
+        </box>
+      ) : attachmentPath ? (
+        <box style={{ flexDirection: "row", height: 1, gap: 1 }}>
+          <text fg={theme.accent}>Attach:</text>
+          <text fg={theme.fg}>{attachmentPath.slice(0, 60)}</text>
         </box>
       ) : null}
       <input

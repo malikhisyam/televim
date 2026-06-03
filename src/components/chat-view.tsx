@@ -8,10 +8,12 @@ function MessageBubble({
   message,
   isSelected,
   allMessages,
+  isRead,
 }: {
   message: Message
   isSelected: boolean
   allMessages: Message[]
+  isRead: boolean
 }) {
   const theme = useStore((s) => s.theme)
   const activeChat = useStore((s) => s.activeChat)
@@ -23,6 +25,9 @@ function MessageBubble({
   const align = message.isOutgoing ? "flex-end" : "flex-start"
   // Differentiate own messages (muted) vs others (bright), but invert when selected
   const senderColor = isSelected ? theme.bg : message.isOutgoing ? theme.muted : theme.fg
+
+  // Read receipt indicator
+  const readIndicator = isRead ? "✓✓" : message.isOutgoing ? "✓" : ""
 
   const d = message.timestamp
   const timeStr = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
@@ -76,7 +81,7 @@ function MessageBubble({
           </text>
         ) : null}
         <text fg={senderColor}>
-          {message.senderName} {fullStr}
+          {message.senderName} {fullStr} {readIndicator}
         </text>
         {messageUrl ? (
           <text fg={fg}>
@@ -94,6 +99,7 @@ const MemoMessageBubble = memo(MessageBubble, (prev, next) => {
   return (
     prev.message.id === next.message.id &&
     prev.isSelected === next.isSelected &&
+    prev.isRead === next.isRead &&
     prev.allMessages.length === next.allMessages.length
   )
 })
@@ -116,6 +122,7 @@ export default function ChatView() {
 
   const activeMessages = activeChat ? messages[`${activeChat.id}${activeThreadId ? `:${activeThreadId}` : ""}`] ?? [] : []
   const isLoadingOlder = useStore((s) => s.isLoadingOlderMessages)
+  const readOutboxMaxId = useStore((s) => s.readOutboxMaxId)
 
   // Build title: "Group > Thread" when in a thread
   let title = activeChat ? activeChat.title : "Messages"
@@ -211,14 +218,18 @@ export default function ChatView() {
               <text fg={theme.muted}>No messages yet</text>
             </box>
           ) : (
-            activeMessages.map((message, index) => (
-              <MemoMessageBubble
-                key={message.id}
-                message={message}
-                isSelected={index === selectedMessageIndex}
-                allMessages={activeMessages}
-              />
-            ))
+            activeMessages.map((message, index) => {
+              const isRead = message.isOutgoing && message.id <= (readOutboxMaxId[message.chatId] || 0)
+              return (
+                <MemoMessageBubble
+                  key={message.id}
+                  message={message}
+                  isSelected={index === selectedMessageIndex}
+                  allMessages={activeMessages}
+                  isRead={isRead}
+                />
+              )
+            })
           )}
         </scrollbox>
       ) : (
