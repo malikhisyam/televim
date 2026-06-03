@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs"
 import { homedir } from "os"
 import { join } from "path"
 
-const CONFIG_DIR = join(homedir(), ".config", "televim")
+export const CONFIG_DIR = join(homedir(), ".config", "televim")
 const CONFIG_FILE = join(CONFIG_DIR, "config.json")
 
 // Embedded default credentials (same pattern as most Telegram clients)

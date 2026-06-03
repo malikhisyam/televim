@@ -330,6 +330,16 @@ function MainApp() {
       if (!activeChat) return
       const msg = messages[msgStoreKey(activeChat.id, activeThreadId)]?.[selectedMessageIndex]
       if (!msg) return
+
+      // 1. If the message text contains a URL, open the first one
+      const urlRegex = /https?:\/\/[^\s]+/g
+      const textUrls = msg.content.match(urlRegex)
+      if (textUrls && textUrls.length > 0) {
+        openUrl(textUrls[0])
+        return
+      }
+
+      // 2. Fall back to media link for groups/channels
       const isMedia = msg.mediaType && msg.mediaType !== "unknown"
       if (!isMedia || activeChat.type === "private") return
       const rawId = msg.chatId

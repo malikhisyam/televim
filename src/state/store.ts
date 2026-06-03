@@ -3,6 +3,7 @@
 import { create } from "zustand"
 import type { Chat, Message, ThemeColors, VimMode } from "../types"
 import { DEFAULT_THEME } from "../constants"
+import { loadDrafts, saveDrafts } from "../lib/draft-store"
 
 export type PaneFocus = "sidebar" | "messages"
 
@@ -359,11 +360,13 @@ export const useStore = create<TeleVimState>((set, get) => ({
       ),
     })),
 
-  drafts: {},
+  drafts: loadDrafts(),
   setDraft: (storeKey, text) =>
-    set((state) => ({
-      drafts: { ...state.drafts, [storeKey]: text },
-    })),
+    set((state) => {
+      const next = { ...state.drafts, [storeKey]: text }
+      saveDrafts(next)
+      return { drafts: next }
+    }),
 
   cloakMode: false,
   toggleCloakMode: () => set((state) => ({ cloakMode: !state.cloakMode })),
