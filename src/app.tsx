@@ -114,8 +114,9 @@ function MainApp() {
     if (!activeChat) return
 
     if (attachmentPath) {
-      void telegram.sendFile(activeChat.id, attachmentPath, text.trim() || undefined, activeThreadId ?? undefined, replyToMessageId ?? undefined).then(() => {
-        setAttachmentPath(null)
+      const path = attachmentPath
+      setAttachmentPath(null) // clear immediately so remounted InputBar doesn't see it
+      void telegram.sendFile(activeChat.id, path, text.trim() || undefined, activeThreadId ?? undefined, replyToMessageId ?? undefined).then(() => {
         if (state.cloakMode) {
           telegram.setCloakMode(true)
         }
@@ -560,11 +561,14 @@ function MainApp() {
 
     onPasteImage: useCallback(() => {
       const state = useStore.getState()
-      const { activeChat, setAttachmentPath } = state
+      const { activeChat, activeThreadId, setAttachmentPath, setDraft, bumpInputKey } = state
       if (!activeChat) return
       const path = pasteClipboardImage()
       if (path) {
         setAttachmentPath(path)
+        const draftKey = msgStoreKey(activeChat.id, activeThreadId)
+        setDraft(draftKey, "")
+        bumpInputKey()
       }
     }, []),
 
@@ -581,6 +585,8 @@ function MainApp() {
     const resolved = raw.startsWith("~") ? raw.replace("~", process.env.HOME || "~") : raw
     if (existsSync(resolved)) {
       const state = useStore.getState()
+      // Don't overwrite an image that was just pasted via Ctrl+V
+      if (state.attachmentPath) return
       state.setAttachmentPath(resolved)
       if (state.activeChat) {
         const draftKey = msgStoreKey(state.activeChat.id, state.activeThreadId)
