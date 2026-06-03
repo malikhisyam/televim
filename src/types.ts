@@ -30,6 +30,7 @@ export interface Message {
   isForwarded?: boolean
   forwardFromName?: string
   mediaType?: "photo" | "video" | "file" | "audio" | "voice" | "sticker" | "gif" | "location" | "poll" | "contact" | "unknown"
+  mediaSize?: number // bytes
 }
 
 export interface ThemeColors {

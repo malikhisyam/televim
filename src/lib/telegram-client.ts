@@ -49,6 +49,12 @@ export class TelegramClient {
   private onlineInterval: ReturnType<typeof setInterval> | null = null
   private cloakMode = false
 
+  // Auto-reconnect state
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null
+  private reconnectAttempt = 0
+  private shouldAutoReconnect = true
+  private maxReconnectDelay = 30000 // 30s cap
+
   // Pending resolvers for auth callbacks
   private pendingPhone: ((phone: string) => void) | null = null
   private pendingCode: ((code: string) => void) | null = null
@@ -101,6 +107,7 @@ export class TelegramClient {
       // Guard against the client being destroyed during connection
       if (!this.gramClient) {
         this.setStatus("error", "Connection interrupted")
+        this.scheduleReconnect()
         return
       }
 
@@ -110,6 +117,7 @@ export class TelegramClient {
         this.setStatus("awaiting-auth")
       } else {
         this.setStatus("connected")
+        this.reconnectAttempt = 0 // Reset backoff on success
         this.saveSession()
         void this.setupUpdates()
         void this.loadInitialChats()
@@ -124,10 +132,13 @@ export class TelegramClient {
       } else {
         this.setStatus("awaiting-auth")
       }
+      this.scheduleReconnect()
     }
   }
 
   async disconnect(): Promise<void> {
+    this.shouldAutoReconnect = false
+    this.clearReconnectTimer()
     this.stopOnlineHeartbeat()
     if (this.gramClient) {
       try {
@@ -154,6 +165,23 @@ export class TelegramClient {
       this.gramClient = null
     }
     this.setStatus("disconnected")
+  }
+
+  private clearReconnectTimer(): void {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer)
+      this.reconnectTimer = null
+    }
+  }
+
+  private scheduleReconnect(): void {
+    if (!this.shouldAutoReconnect) return
+    this.clearReconnectTimer()
+    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempt), this.maxReconnectDelay)
+    this.reconnectAttempt += 1
+    this.reconnectTimer = setTimeout(() => {
+      void this.connect()
+    }, delay)
   }
 
   setCloakMode(enabled: boolean): void {
@@ -688,6 +716,44 @@ export class TelegramClient {
     }
   }
 
+  async searchContacts(query: string, limit = 20): Promise<{ id: number; name: string; username?: string }[]> {
+    if (!this.gramClient) return []
+    try {
+      const result = await this.gramClient.invoke(
+        new Api.contacts.Search({
+          q: query,
+          limit,
+        }),
+      )
+      const rawUsers = (result as any).users ?? []
+      return rawUsers.map((u: any) => ({
+        id: Number(u.id),
+        name: `${u.firstName || ""} ${u.lastName || ""}`.trim() || u.title || "Unknown",
+        username: u.username || undefined,
+      }))
+    } catch (err) {
+      console.error("Failed to search contacts:", err)
+      return []
+    }
+  }
+
+  async downloadMedia(messageId: number, chatId: number, destPath: string): Promise<string | null> {
+    if (!this.gramClient) return null
+    try {
+      const entity = await this.gramClient.getEntity(chatId)
+      const message = await this.gramClient.getMessages(entity, { ids: messageId })
+      if (!message || !message[0]) return null
+      const buffer = await this.gramClient.downloadMedia(message[0])
+      if (!buffer) return null
+      const fs = await import("fs")
+      fs.writeFileSync(destPath, buffer)
+      return destPath
+    } catch (err) {
+      console.error("Failed to download media:", err)
+      return null
+    }
+  }
+
   async updateOnlineStatus(online: boolean): Promise<void> {
     if (!this.gramClient) return
     try {
@@ -849,7 +915,15 @@ function mapDialogToChat(dialog: any): Chat | null {
   return { id, title, type, unreadCount, forum }
 }
 
-function extractMediaInfo(msg: any): { content: string; mediaType?: Message["mediaType"] } {
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return "0 B"
+  const k = 1024
+  const sizes = ["B", "KB", "MB", "GB"]
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`
+}
+
+function extractMediaInfo(msg: any): { content: string; mediaType?: Message["mediaType"]; mediaSize?: number } {
   // gram-js Message instances have .text; raw MTProto objects have .message
   const rawText =
     (typeof msg.text === "string" && msg.text.trim()) ||
@@ -874,25 +948,28 @@ function extractMediaInfo(msg: any): { content: string; mediaType?: Message["med
     const doc = media.document
     const mime = doc?.mimeType || ""
     const attrs = doc?.attributes || []
+    const size = doc?.size ? Number(doc.size) : undefined
 
-    if (mime.startsWith("image/")) return { content: "[Image]", mediaType: "photo" }
-    if (mime.startsWith("video/")) return { content: "[Video]", mediaType: "video" }
-    if (mime.startsWith("audio/")) return { content: "[Audio]", mediaType: "audio" }
+    const sizeLabel = size ? ` (${formatBytes(size)})` : ""
+
+    if (mime.startsWith("image/")) return { content: `[Image${sizeLabel}]`, mediaType: "photo", mediaSize: size }
+    if (mime.startsWith("video/")) return { content: `[Video${sizeLabel}]`, mediaType: "video", mediaSize: size }
+    if (mime.startsWith("audio/")) return { content: `[Audio${sizeLabel}]`, mediaType: "audio", mediaSize: size }
 
     // Check attributes for specific document types
     for (const attr of attrs) {
       const attrClass = attr.className || ""
       if (attrClass === "DocumentAttributeSticker") return { content: "[Sticker]", mediaType: "sticker" }
-      if (attrClass === "DocumentAttributeVideo") return { content: "[Video]", mediaType: "video" }
+      if (attrClass === "DocumentAttributeVideo") return { content: `[Video${sizeLabel}]`, mediaType: "video", mediaSize: size }
       if (attrClass === "DocumentAttributeAudio") {
         return attr.voice
-          ? { content: "[Voice message]", mediaType: "voice" }
-          : { content: "[Audio]", mediaType: "audio" }
+          ? { content: "[Voice message]", mediaType: "voice", mediaSize: size }
+          : { content: `[Audio${sizeLabel}]`, mediaType: "audio", mediaSize: size }
       }
       if (attrClass === "DocumentAttributeAnimated") return { content: "[GIF]", mediaType: "gif" }
     }
 
-    return { content: "[File]", mediaType: "file" }
+    return { content: `[File${sizeLabel}]`, mediaType: "file", mediaSize: size }
   }
 
   if (className === "MessageMediaGeo" || className === "MessageMediaGeoLive") {
@@ -918,7 +995,7 @@ function mapGramMessage(msg: any, chatId: number): Message {
       sender.title ||
       "Unknown"
     : "Unknown"
-  const { content, mediaType } = extractMediaInfo(msg)
+  const { content, mediaType, mediaSize } = extractMediaInfo(msg)
   const timestamp = msg.date ? new Date(msg.date * 1000) : new Date()
   const isOutgoing = msg.out === true
   const replyTo = msg.replyTo
@@ -958,6 +1035,7 @@ function mapGramMessage(msg: any, chatId: number): Message {
     timestamp,
     isOutgoing,
     mediaType,
+    mediaSize,
     replyToMessageId,
     threadId,
     isForwarded,

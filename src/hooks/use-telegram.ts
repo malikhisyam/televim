@@ -5,6 +5,7 @@ import { TelegramClient, type ConnectionStatus } from "../lib/telegram-client"
 import { loadConfig, saveConfig, type TeleVimConfig } from "../lib/config"
 import { loadSession, saveSession, deleteSession, listAccounts, migrateLegacySession } from "../lib/session-store"
 import { useStore } from "../state/store"
+import { sendNotification } from "../lib/notifications"
 import type { Chat, Message, Thread } from "../types"
 
 export type AuthMethod = "phone" | "qr" | null
@@ -40,6 +41,8 @@ export interface UseTelegramResult {
   forwardMessage: (fromChatId: number, toChatId: number, messageId: number) => Promise<void>
   pinMessage: (chatId: number, messageId: number) => Promise<void>
   disconnect: () => Promise<void>
+  searchContacts: (query: string, limit?: number) => Promise<{ id: number; name: string; username?: string }[]>
+  downloadMedia: (messageId: number, chatId: number, destPath: string) => Promise<string | null>
   activeAccount: string
   accounts: string[]
   switchAccount: (name: string) => void
@@ -125,6 +128,13 @@ export function useTelegram(): UseTelegramResult {
     // Auto-read incoming messages when actively viewing the chat and cloak mode is off
     if (!state.cloakMode && isActiveChat && isActiveThread) {
       void clientRef.current?.markAsRead(message.chatId, state.activeThreadId ?? undefined)
+    }
+
+    // Desktop notification for non-active chats
+    if (!isActiveChat || !isActiveThread) {
+      const chatTitle = chat?.title || "Telegram"
+      const preview = message.content.slice(0, 80) || "New message"
+      sendNotification(chatTitle, `${message.senderName}: ${preview}`)
     }
   }, [addMessage])
 
@@ -343,6 +353,16 @@ export function useTelegram(): UseTelegramResult {
     await clientRef.current?.pinMessage(chatId, messageId)
   }, [])
 
+  const searchContacts = useCallback(async (query: string, limit?: number) => {
+    const results = await clientRef.current?.searchContacts(query, limit)
+    return results ?? []
+  }, [])
+
+  const downloadMedia = useCallback(async (messageId: number, chatId: number, destPath: string) => {
+    const result = await clientRef.current?.downloadMedia(messageId, chatId, destPath)
+    return result || null
+  }, [])
+
   const disconnect = useCallback(async () => {
     await clientRef.current?.disconnect()
   }, [])
@@ -378,6 +398,8 @@ export function useTelegram(): UseTelegramResult {
     forwardMessage,
     pinMessage,
     disconnect,
+    searchContacts,
+    downloadMedia,
     activeAccount,
     accounts,
     switchAccount,

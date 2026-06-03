@@ -84,6 +84,8 @@ export default function HelpOverlay() {
           <text fg={theme.fg}>:accounts    List accounts</text>
           <text fg={theme.fg}>:addaccount  Add new account</text>
           <text fg={theme.fg}>:removeaccount Remove account</text>
+          <text fg={theme.fg}>:contact     Search users to DM</text>
+          <text fg={theme.fg}>:download    Download selected media</text>
           <text fg={theme.fg}>:help        Show this help</text>
         </box>
       </box>

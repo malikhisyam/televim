@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef } from "react"
 import { spawn } from "child_process"
 import { existsSync } from "fs"
-import { usePaste } from "@opentui/react"
+import { usePaste, useRenderer } from "@opentui/react"
 import { decodePasteBytes } from "@opentui/core"
 import { MODES } from "./constants"
 import { useStore } from "./state/store"
@@ -13,6 +13,7 @@ import { useVimMode } from "./hooks/use-vim-mode"
 import { msgStoreKey } from "./lib/message-store"
 import { loadCloakMode, saveCloakMode } from "./lib/config"
 import { pasteClipboardImage } from "./lib/clipboard-image"
+import { setNotificationRenderer, sendNotification } from "./lib/notifications"
 
 function openUrl(url: string): void {
   const platform = process.platform
@@ -100,6 +101,12 @@ function MainApp() {
     }, 1000)
     return () => clearInterval(interval)
   }, [])
+
+  // Set up notification renderer (uses OpenTUI OSC notifications when available)
+  const renderer = useRenderer()
+  useEffect(() => {
+    setNotificationRenderer(renderer)
+  }, [renderer])
 
   const handleSendMessage = useCallback((text: string) => {
     const state = useStore.getState()
@@ -458,6 +465,39 @@ function MainApp() {
         if (name) {
           telegram.removeAccount(name)
         }
+      } else if (command.startsWith(":contact ")) {
+        const query = command.slice(8).trim()
+        if (query) {
+          void telegram.searchContacts(query, 20).then((results) => {
+            const state = useStore.getState()
+            // Map contact results to Chat format for the search overlay
+            const mapped = results.map((r) => ({
+              id: r.id,
+              title: r.username ? `${r.name} (@${r.username})` : r.name,
+              type: "private" as const,
+              unreadCount: 0,
+              forum: false,
+            }))
+            state.setSearchResults(mapped)
+            state.setSearchQuery(`contact:${query}`)
+            state.setMode(MODES.SEARCH)
+            state.setSelectedSearchIndex(0)
+          })
+        }
+      } else if (command === ":download") {
+        const state = useStore.getState()
+        const { activeChat, activeThreadId, messages, selectedMessageIndex } = state
+        if (!activeChat) return
+        const storeKey = msgStoreKey(activeChat.id, activeThreadId)
+        const msg = messages[storeKey]?.[selectedMessageIndex]
+        if (!msg || !msg.mediaType || msg.mediaType === "unknown") return
+        const tmpFile = `/tmp/televim-${msg.id}-${Date.now()}.${msg.mediaType === "photo" ? "jpg" : msg.mediaType === "video" ? "mp4" : "bin"}`
+        void telegram.downloadMedia(msg.id, msg.chatId, tmpFile).then((path) => {
+          if (path) {
+            console.log("Downloaded to:", path)
+            openUrl(path)
+          }
+        })
       }
     }, [cycleTheme, telegram]),
 
