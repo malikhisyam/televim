@@ -3,7 +3,7 @@
 import { TelegramClient as GramClient, Api } from "telegram"
 import { StringSession } from "telegram/sessions"
 import { NewMessage } from "telegram/events"
-import { existsSync, readFileSync, writeFileSync } from "fs"
+// Session storage is handled externally (session-store.ts) for multi-account support
 import type { Chat, Message, Thread } from "../types"
 
 export type ConnectionStatus =
@@ -32,9 +32,11 @@ export interface TelegramClientOptions {
   onChatListUpdate?: (chats: Chat[]) => void
   /** Called when a user's online status changes */
   onUserStatusChange?: (userId: number, online: boolean, lastSeen?: Date) => void
+  /** Called when outgoing messages are read by the recipient (read receipt) */
+  onReadOutboxUpdate?: (chatId: number, maxId: number) => void
+  /** Called when the session string should be persisted */
+  onSaveSession?: (session: string) => void
 }
-
-const SESSION_FILE = "./session.txt"
 
 export class TelegramClient {
   private gramClient: GramClient | null = null
@@ -51,10 +53,9 @@ export class TelegramClient {
   private pendingPassword: ((password: string) => void) | null = null
   private pendingQrCode: (() => void) | null = null
 
-  constructor(options: TelegramClientOptions) {
+  constructor(options: TelegramClientOptions, sessionString = "") {
     this.options = options
-    const savedSession = this.loadSession()
-    this.session = new StringSession(savedSession)
+    this.session = new StringSession(sessionString)
   }
 
   // ── Connection lifecycle ──
@@ -321,6 +322,17 @@ export class TelegramClient {
           chats.push(chat)
         }
       }
+
+      // Extract read-outbox max ids for read receipts
+      for (const d of dialogs as any[]) {
+        const peer = d.id || d.peer
+        const chatId = peer ? extractIdFromPeer(peer) : 0
+        const maxId = d.readOutboxMaxId ? Number(d.readOutboxMaxId) : 0
+        if (chatId && maxId > 0) {
+          this.options.onReadOutboxUpdate?.(chatId, maxId)
+        }
+      }
+
       this.options.onChatListUpdate?.(chats)
       return chats
     } catch (err) {
@@ -393,6 +405,35 @@ export class TelegramClient {
     } catch (err) {
       // Most groups are not forums; fail silently
       return []
+    }
+  }
+
+  async sendFile(chatId: number, filePath: string, caption?: string, threadId?: number, replyToMessageId?: number): Promise<Message | null> {
+    if (!this.gramClient) return null
+    try {
+      const entity = await this.gramClient.getEntity(chatId)
+
+      let replyTo: any = undefined
+      if (threadId && replyToMessageId) {
+        replyTo = new Api.InputReplyToMessage({
+          replyToMsgId: replyToMessageId,
+          topMsgId: threadId,
+        })
+      } else if (replyToMessageId) {
+        replyTo = replyToMessageId
+      } else if (threadId) {
+        replyTo = threadId
+      }
+
+      const result = await this.gramClient.sendMessage(entity, {
+        message: caption || "",
+        file: filePath,
+        ...(replyTo !== undefined ? { replyTo } : {}),
+      })
+      return mapGramMessage(result, chatId)
+    } catch (err) {
+      console.error("Failed to send file:", err)
+      return null
     }
   }
 
@@ -500,7 +541,7 @@ export class TelegramClient {
         }
         const senderName = users.get(rawSenderId) || chats.get(rawSenderId) || "Unknown"
 
-        const chatTitle = chats.get(rawChatId) || "Unknown"
+        const chatTitle = chats.get(rawChatId) || users.get(rawChatId) || "Unknown"
 
         const { content: extractedContent, mediaType } = extractMediaInfo(m)
         const content = extractedContent || ""
@@ -711,6 +752,25 @@ export class TelegramClient {
         this.options.onUserStatusChange?.(userId, online, lastSeen)
       }
     })
+
+    // Listen for read receipts (outgoing messages read by recipient)
+    this.gramClient.addEventHandler((update) => {
+      const u = update as any
+      if (u.className === "UpdateReadHistoryOutbox") {
+        const peer = u.peer
+        const chatId = peer ? extractIdFromPeer(peer) : 0
+        const maxId = u.maxId ? Number(u.maxId) : 0
+        if (chatId && maxId > 0) {
+          this.options.onReadOutboxUpdate?.(chatId, maxId)
+        }
+      } else if (u.className === "UpdateReadChannelOutbox") {
+        const channelId = u.channelId ? Number(u.channelId) : 0
+        const maxId = u.maxId ? Number(u.maxId) : 0
+        if (channelId && maxId > 0) {
+          this.options.onReadOutboxUpdate?.(channelId, maxId)
+        }
+      }
+    })
   }
 
   private async loadInitialChats(): Promise<void> {
@@ -722,21 +782,10 @@ export class TelegramClient {
     this.options.onStatusChange?.(status, error)
   }
 
-  private loadSession(): string {
-    try {
-      if (existsSync(SESSION_FILE)) {
-        return readFileSync(SESSION_FILE, "utf-8").trim()
-      }
-    } catch {
-      // ignore
-    }
-    return ""
-  }
-
   private saveSession(): void {
     try {
       const sess = this.session.save() as string
-      writeFileSync(SESSION_FILE, sess)
+      this.options.onSaveSession?.(sess)
     } catch {
       // ignore
     }
@@ -779,9 +828,13 @@ function mapDialogToChat(dialog: any): Chat | null {
 }
 
 function extractMediaInfo(msg: any): { content: string; mediaType?: Message["mediaType"] } {
-  // If message has text, it's a text message (possibly with caption)
-  if (msg.text && msg.text.trim().length > 0) {
-    return { content: msg.text }
+  // gram-js Message instances have .text; raw MTProto objects have .message
+  const rawText =
+    (typeof msg.text === "string" && msg.text.trim()) ||
+    (typeof msg.message === "string" && msg.message.trim()) ||
+    ""
+  if (rawText.length > 0) {
+    return { content: rawText }
   }
 
   const media = msg.media

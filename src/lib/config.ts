@@ -15,6 +15,7 @@ const DEFAULT_API_HASH = "b18441a1ff607e10a989891a5462e627"
 export interface TeleVimConfig {
   apiId: number
   apiHash: string
+  activeAccount?: string
 }
 
 export function loadConfig(): TeleVimConfig {

@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { TelegramClient, type ConnectionStatus } from "../lib/telegram-client"
-import { loadConfig } from "../lib/config"
+import { loadConfig, saveConfig, type TeleVimConfig } from "../lib/config"
+import { loadSession, saveSession, deleteSession, listAccounts, migrateLegacySession } from "../lib/session-store"
 import { useStore } from "../state/store"
 import type { Chat, Message, Thread } from "../types"
 
@@ -24,6 +25,7 @@ export interface UseTelegramResult {
   submitCode: (code: string) => void
   submitPassword: (password: string) => void
   sendMessage: (chatId: number, text: string, threadId?: number, replyToMessageId?: number) => Promise<Message | null>
+  sendFile: (chatId: number, filePath: string, caption?: string, threadId?: number, replyToMessageId?: number) => Promise<Message | null>
   getMessages: (chatId: number, threadId?: number, limit?: number) => Promise<Message[]>
   getOlderMessages: (chatId: number, beforeId: number, threadId?: number, limit?: number) => Promise<Message[]>
   getForumTopics: (chatId: number) => Promise<Thread[]>
@@ -38,6 +40,11 @@ export interface UseTelegramResult {
   forwardMessage: (fromChatId: number, toChatId: number, messageId: number) => Promise<void>
   pinMessage: (chatId: number, messageId: number) => Promise<void>
   disconnect: () => Promise<void>
+  activeAccount: string
+  accounts: string[]
+  switchAccount: (name: string) => void
+  addAccount: (name: string) => void
+  removeAccount: (name: string) => void
 }
 
 export function useTelegram(): UseTelegramResult {
@@ -50,10 +57,23 @@ export function useTelegram(): UseTelegramResult {
   const [qrData, setQrData] = useState<string | undefined>()
   const [qrExpires, setQrExpires] = useState<number | undefined>()
   const clientRef = useRef<TelegramClient | null>(null)
-  const connectedRef = useRef(false)
+  const connectingRef = useRef(false)
+
+  const [activeAccount, setActiveAccount] = useState<string>(() => {
+    // Migrate legacy ./session.txt on first run
+    const migrated = migrateLegacySession()
+    if (migrated) {
+      const cfg = loadConfig()
+      saveConfig({ ...cfg, activeAccount: migrated })
+      return migrated
+    }
+    return config.activeAccount || "default"
+  })
+  const [accounts, setAccounts] = useState<string[]>(() => listAccounts())
 
   const setChats = useStore((s) => s.setChats)
   const addMessage = useStore((s) => s.addMessage)
+  const setReadOutboxMaxId = useStore((s) => s.setReadOutboxMaxId)
 
   const isReady = status === "connected"
   const needsAuth = status === "awaiting-auth" || status === "awaiting-phone" || status === "awaiting-code" || status === "awaiting-password"
@@ -123,28 +143,97 @@ export function useTelegram(): UseTelegramResult {
     useStore.getState().setUserOnline(userId, online, lastSeen)
   }, [])
 
-  // Create client once and keep it in ref
-  if (!clientRef.current) {
-    clientRef.current = new TelegramClient({
-      auth: { apiId: config.apiId, apiHash: config.apiHash },
-      onStatusChange,
-      onNewMessage,
-      onChatListUpdate,
-      onUserStatusChange,
-    })
-  }
+  const onReadOutboxUpdate = useCallback((chatId: number, maxId: number) => {
+    setReadOutboxMaxId(chatId, maxId)
+  }, [setReadOutboxMaxId])
 
-  // Auto-connect on mount — only once
+  // Create / reconnect client whenever activeAccount changes
   useEffect(() => {
-    if (connectedRef.current) return
-    connectedRef.current = true
-    void clientRef.current!.connect()
+    let cancelled = false
+
+    async function setup() {
+      if (connectingRef.current) return
+      connectingRef.current = true
+
+      // Disconnect previous client
+      if (clientRef.current) {
+        try {
+          await clientRef.current.disconnect()
+        } catch {
+          // ignore
+        }
+        clientRef.current = null
+      }
+
+      if (cancelled) {
+        connectingRef.current = false
+        return
+      }
+
+      const sessionString = loadSession(activeAccount)
+      const client = new TelegramClient(
+        {
+          auth: { apiId: config.apiId, apiHash: config.apiHash },
+          onStatusChange,
+          onNewMessage,
+          onChatListUpdate,
+          onUserStatusChange,
+          onReadOutboxUpdate,
+          onSaveSession: (sess) => saveSession(activeAccount, sess),
+        },
+        sessionString,
+      )
+
+      clientRef.current = client
+
+      if (!cancelled) {
+        await client.connect()
+      }
+      connectingRef.current = false
+    }
+
+    void setup()
 
     return () => {
+      cancelled = true
       void clientRef.current?.disconnect()
-      connectedRef.current = false
+      clientRef.current = null
+      connectingRef.current = false
     }
+  }, [activeAccount, config, onStatusChange, onNewMessage, onChatListUpdate, onUserStatusChange, onReadOutboxUpdate])
+
+  const switchAccount = useCallback((name: string) => {
+    const cfg = loadConfig()
+    saveConfig({ ...cfg, activeAccount: name })
+    setActiveAccount(name)
+    setAccounts(listAccounts())
+    // Reset auth UI state for the new account
+    setAuthMethodState(null)
+    setStatus("connecting")
+    setStatusError(undefined)
+    setQrData(undefined)
+    setQrExpires(undefined)
   }, [])
+
+  const addAccount = useCallback((name: string) => {
+    const safe = name.trim().replace(/[^a-zA-Z0-9_-]/g, "_")
+    if (!safe) return
+    switchAccount(safe)
+  }, [switchAccount])
+
+  const removeAccount = useCallback((name: string) => {
+    deleteSession(name)
+    const remaining = listAccounts()
+    setAccounts(remaining)
+    if (activeAccount === name) {
+      const first = remaining[0]
+      if (first) {
+        switchAccount(first)
+      } else {
+        switchAccount("default")
+      }
+    }
+  }, [activeAccount, switchAccount])
 
   const setAuthMethod = useCallback((method: AuthMethod) => {
     setAuthMethodState(method)
@@ -169,6 +258,15 @@ export function useTelegram(): UseTelegramResult {
 
   const sendMessage = useCallback(async (chatId: number, text: string, threadId?: number, replyToMessageId?: number) => {
     const result = await clientRef.current?.sendMessage(chatId, text, threadId, replyToMessageId)
+    if (result) {
+      const key = threadId ? `${chatId}:${threadId}` : `${chatId}`
+      addMessage(key, result)
+    }
+    return result || null
+  }, [addMessage])
+
+  const sendFile = useCallback(async (chatId: number, filePath: string, caption?: string, threadId?: number, replyToMessageId?: number) => {
+    const result = await clientRef.current?.sendFile(chatId, filePath, caption, threadId, replyToMessageId)
     if (result) {
       const key = threadId ? `${chatId}:${threadId}` : `${chatId}`
       addMessage(key, result)
@@ -253,6 +351,7 @@ export function useTelegram(): UseTelegramResult {
     submitCode,
     submitPassword,
     sendMessage,
+    sendFile,
     getMessages,
     getOlderMessages,
     getForumTopics,
@@ -267,5 +366,10 @@ export function useTelegram(): UseTelegramResult {
     forwardMessage,
     pinMessage,
     disconnect,
+    activeAccount,
+    accounts,
+    switchAccount,
+    addAccount,
+    removeAccount,
   }
 }

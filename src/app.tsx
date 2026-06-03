@@ -414,6 +414,25 @@ function MainApp() {
         if (path) {
           useStore.getState().setAttachmentPath(path)
         }
+      } else if (command.startsWith(":account ")) {
+        const name = command.slice(8).trim()
+        if (name) {
+          telegram.switchAccount(name)
+        }
+      } else if (command === ":accounts") {
+        const accs = telegram.accounts
+        const current = telegram.activeAccount
+        console.log("Accounts:", accs.join(", "), "| current:", current)
+      } else if (command.startsWith(":addaccount ")) {
+        const name = command.slice(11).trim()
+        if (name) {
+          telegram.addAccount(name)
+        }
+      } else if (command.startsWith(":removeaccount ")) {
+        const name = command.slice(14).trim()
+        if (name) {
+          telegram.removeAccount(name)
+        }
       }
     }, [cycleTheme, telegram]),
 

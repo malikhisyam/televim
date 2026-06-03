@@ -59,11 +59,14 @@ export default function AuthScreen({ telegram }: AuthScreenProps) {
   useKeyboard(
     useCallback((key) => {
       if (!authMethod && (status === "awaiting-auth" || status === "error")) {
-        if (key.name === "j" || key.name === "down") {
+        if (key.name === "j" || key.name === "down" || (key.name === "tab" && !key.shift)) {
+          key.stopPropagation()
           setSelectedIndex((prev) => Math.min(MENU_ITEMS.length - 1, prev + 1))
-        } else if (key.name === "k" || key.name === "up") {
+        } else if (key.name === "k" || key.name === "up" || (key.name === "tab" && key.shift)) {
+          key.stopPropagation()
           setSelectedIndex((prev) => Math.max(0, prev - 1))
         } else if (key.name === "return" || key.name === "enter") {
+          key.stopPropagation()
           const item = MENU_ITEMS[selectedIndex]
           if (item) {
             setAuthMethod(item.key)
@@ -126,6 +129,7 @@ export default function AuthScreen({ telegram }: AuthScreenProps) {
       >
         <text fg={theme.accent}>Welcome to TeleVim</text>
         <text fg={theme.muted}>A terminal-native Telegram client</text>
+        <text fg={theme.muted}>Account: {telegram.activeAccount}</text>
         <box style={{ height: 1 }} />
         <text fg={theme.fg}>Choose a login method:</text>
         <box style={{ height: 1 }} />

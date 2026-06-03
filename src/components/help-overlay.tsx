@@ -80,6 +80,10 @@ export default function HelpOverlay() {
           <text fg={theme.fg}>:searchglobal Search all chats</text>
           <text fg={theme.fg}>:attach      Attach a file by path</text>
           <text fg={theme.fg}>:pasteimage  Paste image from clipboard</text>
+          <text fg={theme.fg}>:account     Switch to account</text>
+          <text fg={theme.fg}>:accounts    List accounts</text>
+          <text fg={theme.fg}>:addaccount  Add new account</text>
+          <text fg={theme.fg}>:removeaccount Remove account</text>
           <text fg={theme.fg}>:help        Show this help</text>
         </box>
       </box>
