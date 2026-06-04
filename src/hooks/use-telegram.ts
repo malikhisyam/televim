@@ -130,8 +130,8 @@ export function useTelegram(): UseTelegramResult {
       void clientRef.current?.markAsRead(message.chatId, state.activeThreadId ?? undefined)
     }
 
-    // Desktop notification for non-active chats
-    if (!isActiveChat || !isActiveThread) {
+    // Desktop notification for non-active chats (only if enabled)
+    if ((!isActiveChat || !isActiveThread) && state.notificationsEnabled) {
       const chatTitle = chat?.title || "Telegram"
       const preview = message.content.slice(0, 80) || "New message"
       sendNotification(chatTitle, `${message.senderName}: ${preview}`)

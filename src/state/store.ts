@@ -153,6 +153,10 @@ export interface TeleVimState {
   readOutboxMaxId: Record<number, number>
   setReadOutboxMaxId: (chatId: number, maxId: number) => void
 
+  // Desktop notifications
+  notificationsEnabled: boolean
+  toggleNotifications: () => void
+
   // Reset helpers
   resetToNormal: () => void
 }
@@ -429,6 +433,10 @@ export const useStore = create<TeleVimState>((set, get) => ({
     set((state) => ({
       readOutboxMaxId: { ...state.readOutboxMaxId, [chatId]: maxId },
     })),
+
+  notificationsEnabled: true,
+  toggleNotifications: () =>
+    set((state) => ({ notificationsEnabled: !state.notificationsEnabled })),
 
   helpVisible: false,
   toggleHelp: () => set((state) => ({ helpVisible: !state.helpVisible })),

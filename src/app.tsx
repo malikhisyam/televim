@@ -13,7 +13,8 @@ import { useVimMode } from "./hooks/use-vim-mode"
 import { msgStoreKey } from "./lib/message-store"
 import { loadCloakMode, saveCloakMode } from "./lib/config"
 import { pasteClipboardImage } from "./lib/clipboard-image"
-import { setNotificationRenderer, sendNotification } from "./lib/notifications"
+import { setNotificationRenderer, downloadTelegramIcon } from "./lib/notifications"
+import { loadNotificationsEnabled, saveNotificationsEnabled } from "./lib/notification-store"
 
 function openUrl(url: string): void {
   const platform = process.platform
@@ -87,6 +88,14 @@ function MainApp() {
     }
   }, [])
 
+  // Load persisted notification setting on mount
+  useEffect(() => {
+    const saved = loadNotificationsEnabled()
+    if (!saved) {
+      useStore.getState().toggleNotifications()
+    }
+  }, [])
+
   // Auto-clear expired typing indicators every second
   useEffect(() => {
     const interval = setInterval(() => {
@@ -106,6 +115,8 @@ function MainApp() {
   const renderer = useRenderer()
   useEffect(() => {
     setNotificationRenderer(renderer)
+    // Download Telegram logo for notifications (best-effort, ignore errors)
+    void downloadTelegramIcon()
   }, [renderer])
 
   const handleSendMessage = useCallback((text: string) => {
@@ -399,6 +410,11 @@ function MainApp() {
             state.resetChatUnread(activeChat.id)
           }
         }
+      } else if (command === ":notify") {
+        const state = useStore.getState()
+        const next = !state.notificationsEnabled
+        state.toggleNotifications()
+        saveNotificationsEnabled(next)
       } else if (command === ":help") {
         useStore.getState().toggleHelp()
       } else if (command.startsWith(":privacy ")) {
