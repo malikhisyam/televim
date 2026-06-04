@@ -6,6 +6,7 @@ import { loadConfig, saveConfig, type TeleVimConfig } from "../lib/config"
 import { loadSession, saveSession, deleteSession, listAccounts, migrateLegacySession } from "../lib/session-store"
 import { useStore } from "../state/store"
 import { sendNotification } from "../lib/notifications"
+import { msgStoreKey } from "../lib/message-store"
 import type { Chat, Message, Thread } from "../types"
 
 export type AuthMethod = "phone" | "qr" | null
@@ -135,6 +136,20 @@ export function useTelegram(): UseTelegramResult {
       const chatTitle = chat?.title || "Telegram"
       const preview = message.content.slice(0, 80) || "New message"
       sendNotification(chatTitle, `${message.senderName}: ${preview}`)
+    }
+
+    // Auto-scroll and select newest message for incoming messages in active chat
+    if (!message.isOutgoing) {
+      const afterState = useStore.getState()
+      const isStillActive = afterState.activeChat?.id === message.chatId
+      const isStillActiveThread = afterState.activeThreadId
+        ? afterState.activeThreadId === threadId
+        : !isThreadMessage
+      if (isStillActive && isStillActiveThread) {
+        const storeKey = msgStoreKey(message.chatId, afterState.activeThreadId)
+        const msgs = afterState.messages[storeKey] ?? []
+        afterState.setSelectedMessageIndex(Math.max(0, msgs.length - 1))
+      }
     }
   }, [addMessage])
 
