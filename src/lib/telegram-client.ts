@@ -1027,6 +1027,11 @@ function mapGramMessage(msg: any, chatId: number): Message {
     }
   }
 
+  // Extract formatting entities from gram-js message
+  const entities = msg.entities
+    ? (msg.entities as any[]).map(mapEntity).filter((e): e is NonNullable<typeof e> => e !== null)
+    : undefined
+
   return {
     id,
     chatId,
@@ -1036,10 +1041,38 @@ function mapGramMessage(msg: any, chatId: number): Message {
     isOutgoing,
     mediaType,
     mediaSize,
+    entities,
     replyToMessageId,
     threadId,
     isForwarded,
     forwardFromName,
+  }
+}
+
+function mapEntity(entity: any): import("../types").MessageEntity | null {
+  const className = entity.className || ""
+  const offset = entity.offset ?? 0
+  const length = entity.length ?? 0
+
+  switch (className) {
+    case "MessageEntityBold":
+      return { type: "bold", offset, length }
+    case "MessageEntityItalic":
+      return { type: "italic", offset, length }
+    case "MessageEntityCode":
+      return { type: "code", offset, length }
+    case "MessageEntityPre":
+      return { type: "pre", offset, length }
+    case "MessageEntityStrike":
+      return { type: "strikethrough", offset, length }
+    case "MessageEntityUnderline":
+      return { type: "underline", offset, length }
+    case "MessageEntityUrl":
+      return { type: "url", offset, length }
+    case "MessageEntityTextUrl":
+      return { type: "text_link", offset, length, url: entity.url || "" }
+    default:
+      return null
   }
 }
 

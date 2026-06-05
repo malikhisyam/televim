@@ -1,8 +1,37 @@
 // src/components/chat-view.tsx — Discord-style messages pane
 
-import { memo, useEffect, useRef } from "react"
+import React, { memo, useEffect, useRef } from "react"
 import { useStore } from "../state/store"
 import type { Message } from "../types"
+import { formatEntities, type TextSegment } from "../lib/text-formatter"
+
+function renderSegments(segments: TextSegment[], baseColor: string): React.ReactNode {
+  return (
+    <text fg={baseColor}>
+      {segments.map((seg, i) => {
+        let content: React.ReactNode = <span>{seg.text}</span>
+        if (seg.url) {
+          content = <a href={seg.url}><u>{seg.text}</u></a>
+        }
+        if (seg.bold) {
+          content = <strong>{content}</strong>
+        }
+        if (seg.italic) {
+          content = <em>{content}</em>
+        }
+        if (seg.code || seg.pre) {
+          content = <span>{content}</span>
+        }
+        // code blocks use accent color
+        return (
+          <span key={i}>
+            {content}
+          </span>
+        )
+      })}
+    </text>
+  )
+}
 
 function MessageBubble({
   message,
@@ -50,6 +79,9 @@ function MessageBubble({
     ? allMessages.find((m) => m.id === message.replyToMessageId)
     : undefined
 
+  // Format message content with Telegram entities
+  const contentSegments = formatEntities(message.content, message.entities)
+
   return (
     <box
       id={`msg-${message.id}`}
@@ -88,7 +120,7 @@ function MessageBubble({
             <a href={messageUrl}><u>{message.content}</u></a>
           </text>
         ) : (
-          <text fg={fg}>{message.content}</text>
+          renderSegments(contentSegments, fg)
         )}
       </box>
     </box>
@@ -100,7 +132,8 @@ const MemoMessageBubble = memo(MessageBubble, (prev, next) => {
     prev.message.id === next.message.id &&
     prev.isSelected === next.isSelected &&
     prev.isRead === next.isRead &&
-    prev.allMessages.length === next.allMessages.length
+    prev.allMessages.length === next.allMessages.length &&
+    JSON.stringify(prev.message.entities) === JSON.stringify(next.message.entities)
   )
 })
 
