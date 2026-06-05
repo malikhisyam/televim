@@ -1,0 +1,22 @@
+#!/usr/bin/env node
+// CLI entry point for npm/npx — falls back to bun if available, otherwise node
+
+const { spawn } = require("child_process")
+const path = require("path")
+
+const distPath = path.join(__dirname, "..", "dist", "main.js")
+const bunAvailable = () => {
+  try {
+    require("child_process").execSync("bun --version", { stdio: "ignore" })
+    return true
+  } catch {
+    return false
+  }
+}
+
+if (bunAvailable()) {
+  spawn("bun", [distPath], { stdio: "inherit" })
+} else {
+  console.error("televim requires Bun to run. Install it from https://bun.sh")
+  process.exit(1)
+}

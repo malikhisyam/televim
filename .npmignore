@@ -1,0 +1,15 @@
+src/
+node_modules/
+*.log
+.env
+.env.local
+.DS_Store
+.vscode/
+.idea/
+*.tsbuildinfo
+bun.lock
+session.txt
+*.session
+agents/
+skills-lock.json
+AGENTS.md

@@ -1,11 +1,42 @@
 {
   "name": "televim",
-  "module": "src/main.tsx",
+  "version": "0.1.0",
+  "description": "A Vim-inspired terminal UI for Telegram — fast, modal, and distraction-free messaging for keyboard power users.",
   "type": "module",
-  "private": true,
+  "main": "dist/main.js",
+  "module": "src/main.tsx",
+  "bin": {
+    "televim": "bin/televim"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "themes",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "start": "bun run src/main.tsx",
-    "dev": "bun run --watch src/main.tsx"
+    "dev": "bun run --watch src/main.tsx",
+    "build": "bun build src/main.tsx --outdir dist --target bun --minify",
+    "compile": "bun build src/main.tsx --compile --outfile bin/televim",
+    "prepublishOnly": "bun run build && bun run compile"
+  },
+  "keywords": [
+    "telegram",
+    "cli",
+    "terminal",
+    "tui",
+    "vim",
+    "messenger",
+    "chat",
+    "opentui",
+    "react"
+  ],
+  "author": "Hisyam Malik",
+  "license": "MIT",
+  "engines": {
+    "bun": ">=1.0.0"
   },
   "devDependencies": {
     "@types/bun": "latest",
