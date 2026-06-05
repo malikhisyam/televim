@@ -1,0 +1,14 @@
+{
+  "name": "default",
+  "description": "Oceanic Next inspired theme for TeleVim",
+  "colors": {
+    "fg": "#c0c5ce",
+    "bg": "#1b2b34",
+    "accent": "#6699cc",
+    "muted": "#65737e",
+    "border": "#4f5b66",
+    "success": "#99c794",
+    "error": "#ec5f67",
+    "warning": "#fac863"
+  }
+}
