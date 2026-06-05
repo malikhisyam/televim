@@ -633,7 +633,7 @@ function MainApp() {
         flexDirection: "row",
         width: "100%",
         height: "100%",
-        padding: 1,
+        padding: 0,
         gap: 1,
         backgroundColor: theme.bg,
       }}

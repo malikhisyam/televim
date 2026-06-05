@@ -206,7 +206,7 @@ export default function ChatView() {
         borderStyle: "rounded",
         borderColor: borderColor,
         backgroundColor: theme.bg,
-        padding: 1,
+        padding: 0,
         gap: 0,
       }}
       title={`${title}${onlineIndicator}`}

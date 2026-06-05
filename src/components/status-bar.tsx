@@ -43,32 +43,9 @@ export default function StatusBar() {
   const typingText = activeTyping ? `${activeTyping.name} is typing...` : ""
 
   return (
-    <box
-      style={{
-        height: 3,
-        width: "100%",
-        flexDirection: "row",
-        backgroundColor: theme.bg,
-        border: true,
-        borderStyle: "rounded",
-        borderColor: theme.border,
-        paddingX: 1,
-        alignItems: "center",
-        justifyContent: "space-between",
-      }}
-    >
-      {isTypingCommand ? (
-        <text fg={theme.fg}>{typedText}</text>
-      ) : (
-        <text fg={theme.muted}>
-          {cloakBadge}{hint}
-        </text>
-      )}
-      {typingText ? (
-        <text fg={theme.accent}>{typingText}</text>
-      ) : mode === MODES.COMMAND ? (
-        <text fg={theme.muted}>type :help for keybindings</text>
-      ) : null}
-    </box>
+    <text fg={theme.muted}>
+      {isTypingCommand ? typedText : `${cloakBadge}${hint}`}
+      {typingText ? `  ${typingText}` : ""}
+    </text>
   )
 }
