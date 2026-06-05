@@ -1,7 +1,7 @@
 // mcp-server/src/telegram-client.ts — Reusable Telegram client for MCP
 
 import { TelegramClient as GramClient, Api } from "telegram"
-import { StringSession } from "telegram/sessions"
+import { StringSession } from "telegram/sessions/index.js"
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs"
 import { homedir } from "os"
 import { join } from "path"
@@ -106,7 +106,7 @@ export class TelegramMcpClient {
 
     const stringSession = new StringSession(session)
     this.gramClient = new GramClient(
-      stringSession,
+      stringSession as any,
       config.apiId,
       config.apiHash,
       {
