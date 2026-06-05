@@ -31,6 +31,14 @@ export interface Message {
   forwardFromName?: string
   mediaType?: "photo" | "video" | "file" | "audio" | "voice" | "sticker" | "gif" | "location" | "poll" | "contact" | "unknown"
   mediaSize?: number // bytes
+  entities?: MessageEntity[]
+}
+
+export interface MessageEntity {
+  type: "bold" | "italic" | "code" | "pre" | "strikethrough" | "underline" | "url" | "text_link"
+  offset: number
+  length: number
+  url?: string
 }
 
 export interface ThemeColors {
