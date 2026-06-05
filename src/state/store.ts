@@ -449,5 +449,10 @@ export const useStore = create<TeleVimState>((set, get) => ({
       mode: "normal",
       commandBuffer: "",
       searchQuery: "",
+      replyToMessageId: null,
+      editMessageId: null,
+      forwardMessageId: null,
+      forwardTargetChatId: null,
+      attachmentPath: null,
     }),
 }))
