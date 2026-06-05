@@ -281,27 +281,12 @@ export function useVimMode(options: UseVimModeOptions = {}) {
         return
       }
 
-      // ── GLOBAL: Escape always returns to Normal + sidebar focus ──
-      if (keyName === "escape") {
-        consume()
-        if (state.attachmentPath) {
-          state.setAttachmentPath(null)
-          return
-        }
-        if (state.forwardMessageId) {
-          state.setForwardMessageId(null)
-          state.setPaneFocus("messages")
-          return
-        }
-        state.setPaneFocus("sidebar")
-        state.resetToNormal()
-        return
-      }
-
       // ── INSERT mode ──
       if (state.mode === MODES.INSERT) {
         if (keyName === "escape") {
           consume()
+          // From Insert mode: first Escape goes to Normal + messages pane focus
+          state.setPaneFocus("messages")
           state.resetToNormal()
           return
         }
@@ -365,6 +350,13 @@ export function useVimMode(options: UseVimModeOptions = {}) {
 
       // ── SEARCH mode ──
       if (state.mode === MODES.SEARCH) {
+        if (keyName === "escape") {
+          consume()
+          state.resetToNormal()
+          state.setSearchResults([])
+          state.setSearchQuery("")
+          return
+        }
         const results = state.searchResults
         const maxResultIndex = Math.max(0, results.length - 1)
 
@@ -429,6 +421,29 @@ export function useVimMode(options: UseVimModeOptions = {}) {
           return
         }
         // Unhandled keys in search mode: let them pass through (e.g. arrow keys)
+        return
+      }
+
+      // ── GLOBAL: Escape returns to Normal mode ──
+      if (keyName === "escape") {
+        consume()
+        if (state.attachmentPath) {
+          state.setAttachmentPath(null)
+          return
+        }
+        if (state.forwardMessageId) {
+          state.setForwardMessageId(null)
+          state.setPaneFocus("messages")
+          return
+        }
+        // If already in Normal mode with messages pane, first Escape goes to sidebar
+        // If coming from Insert/Visual/Command/Search, state.resetToNormal() already set messages pane
+        if (state.paneFocus === "messages" && state.mode === MODES.NORMAL) {
+          state.setPaneFocus("sidebar")
+        } else {
+          state.setPaneFocus("messages")
+          state.resetToNormal()
+        }
         return
       }
 
