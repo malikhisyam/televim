@@ -75,6 +75,7 @@ function MainApp() {
   const telegram = useTelegram()
   const fetchingTopicsRef = useRef<Set<number>>(new Set())
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastFetchedOldestIdRef = useRef<Map<string, number>>(new Map())
 
   const mode = useStore((s) => s.mode)
   const inputKey = useStore((s) => s.inputKey)
@@ -188,26 +189,50 @@ function MainApp() {
       state.setSelectedMessageIndex(0)
       maybeMarkAsRead(chat.id, threadId)
       const storeKey = `${chat.id}${threadId ? `:${threadId}` : ""}`
-      // If targetMessageId is provided, load messages around it (offsetId = targetMessageId + 1 to include the target)
-      const offsetId = targetMessageId ? targetMessageId + 1 : undefined
-      void telegram.getMessages(chat.id, threadId, 50, offsetId).then((msgs) => {
-        const fresh = useStore.getState()
-        if (msgs.length > 0) {
-          fresh.setMessages({
-            ...fresh.messages,
-            [storeKey]: msgs,
-          })
-          if (targetMessageId) {
+
+      // Clear the last fetched oldest ID so we can fetch again
+      lastFetchedOldestIdRef.current.delete(storeKey)
+
+      if (targetMessageId) {
+        // Load messages around the target AND the latest messages
+        const aroundPromise = telegram.getMessages(chat.id, threadId, 50, targetMessageId + 1)
+        const latestPromise = telegram.getMessages(chat.id, threadId, 50)
+        void Promise.all([aroundPromise, latestPromise]).then(([aroundMsgs, latestMsgs]) => {
+          const fresh = useStore.getState()
+          // Merge and deduplicate by message id
+          const merged = new Map<number, typeof aroundMsgs[0]>()
+          for (const m of aroundMsgs) merged.set(m.id, m)
+          for (const m of latestMsgs) merged.set(m.id, m)
+          const msgs = Array.from(merged.values())
+          // Sort by id ascending (oldest first, newest last)
+          msgs.sort((a, b) => a.id - b.id)
+
+          if (msgs.length > 0) {
+            fresh.setMessages({
+              ...fresh.messages,
+              [storeKey]: msgs,
+            })
             const msgIndex = msgs.findIndex((m) => m.id === targetMessageId)
             if (msgIndex !== -1) {
               fresh.setSelectedMessageIndex(msgIndex)
-              return
+            } else {
+              fresh.setSelectedMessageIndex(msgs.length - 1)
             }
           }
-          // Start selection at the newest message (last in array, bottom of view)
-          fresh.setSelectedMessageIndex(msgs.length - 1)
-        }
-      })
+        })
+      } else {
+        // Normal load: just get latest messages
+        void telegram.getMessages(chat.id, threadId, 50).then((msgs) => {
+          const fresh = useStore.getState()
+          if (msgs.length > 0) {
+            fresh.setMessages({
+              ...fresh.messages,
+              [storeKey]: msgs,
+            })
+            fresh.setSelectedMessageIndex(msgs.length - 1)
+          }
+        })
+      }
     }, [telegram, maybeMarkAsRead]),
 
     onExpandChat: useCallback((chatId: number) => {
@@ -252,9 +277,11 @@ function MainApp() {
       const target = currentIndex + (direction === "next" ? count : -count)
 
       // If we'd go near the top (target <= 2) and there are messages, try to load older ones
-      if (target <= 2 && msgs.length > 0 && !isLoadingOlderMessages) {
+      // But don't fetch again if we already fetched from this oldestId and got empty
+      const oldestId = msgs[0]?.id
+      const lastFetchedOldestId = lastFetchedOldestIdRef.current.get(storeKey)
+      if (target <= 2 && msgs.length > 0 && !isLoadingOlderMessages && oldestId !== undefined && lastFetchedOldestId !== oldestId) {
         setLoadingOlderMessages(true)
-        const oldestId = msgs[0]!.id
         void telegram.getOlderMessages(activeChat.id, oldestId, activeThreadId ?? undefined, 50).then((older) => {
           setLoadingOlderMessages(false)
           if (older.length > 0) {
@@ -263,7 +290,8 @@ function MainApp() {
             const newIndex = Math.max(0, currentIndex + older.length + (direction === "next" ? count : -count))
             setSelectedMessageIndex(newIndex)
           } else {
-            // No more older messages — clamp to the oldest available
+            // No more older messages — remember this oldestId so we don't fetch again
+            lastFetchedOldestIdRef.current.set(storeKey, oldestId)
             setSelectedMessageIndex(Math.max(0, target))
           }
         })

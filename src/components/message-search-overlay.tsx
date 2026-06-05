@@ -3,32 +3,18 @@
 import { memo, useEffect, useRef } from "react"
 import { useStore } from "../state/store"
 
-function HighlightedText({
-  text,
-  query,
-  fg,
-  highlightFg,
-}: {
-  text: string
-  query: string
-  fg: string
-  highlightFg: string
-}) {
-  if (!query) return <text fg={fg}>{text}</text>
-  const lowerText = text.toLowerCase()
-  const lowerQuery = query.toLowerCase()
-  const index = lowerText.indexOf(lowerQuery)
-  if (index === -1) return <text fg={fg}>{text}</text>
-  const before = text.slice(0, index)
-  const match = text.slice(index, index + query.length)
-  const after = text.slice(index + query.length)
-  return (
-    <text fg={fg}>
-      {before}
-      <span fg={highlightFg}>{match}</span>
-      {after}
-    </text>
-  )
+const SNIPPET_LEN = 55
+
+function getMatchSnippet(content: string, query: string, maxLen: number): string {
+  const lowerQuery = query.toLowerCase().trim()
+  if (!lowerQuery) return content.slice(0, maxLen)
+  const lowerContent = content.toLowerCase()
+  const index = lowerContent.indexOf(lowerQuery)
+  if (index === -1) return content.slice(0, maxLen)
+  // Show snippet around the match
+  const start = Math.max(0, index - 10)
+  const end = Math.min(content.length, start + maxLen)
+  return content.slice(start, end)
 }
 
 const ResultItem = memo(function ResultItem({
@@ -46,7 +32,7 @@ const ResultItem = memo(function ResultItem({
     hour: "2-digit",
     minute: "2-digit",
   })
-  const displayContent = msg.content.slice(0, 60)
+  const displayContent = getMatchSnippet(msg.content, query, SNIPPET_LEN)
   return (
     <box
       id={`search-${msg.id}`}
@@ -61,12 +47,9 @@ const ResultItem = memo(function ResultItem({
       <text fg={isSelected ? theme.bg : theme.fg}>
         {msg.senderName} {timeStr}
       </text>
-      <HighlightedText
-        text={displayContent}
-        query={query}
-        fg={isSelected ? theme.bg : theme.muted}
-        highlightFg={isSelected ? theme.bg : theme.accent}
-      />
+      <text fg={isSelected ? theme.bg : theme.muted}>
+        {displayContent}
+      </text>
     </box>
   )
 })
@@ -93,6 +76,12 @@ export default function MessageSearchOverlay() {
     }
   }, [selectedIndex, results])
 
+  // Calculate the inner height for the scrollbox
+  // Total overlay height is 60% of terminal
+  // Query text: ~1 row, separator: 1 row, hint: ~1 row, padding: 2 rows
+  // So scrollbox should get the rest
+  const scrollHeight = 16  // approximate height in rows
+
   return (
     <box
       style={{
@@ -107,41 +96,48 @@ export default function MessageSearchOverlay() {
         borderColor: theme.accent,
         backgroundColor: theme.bg,
         padding: 1,
+        overflow: "hidden",
       }}
     >
-      <text fg={theme.accent}>
-        {isGlobal ? "Global Search" : "Search"}: {query}
-      </text>
-      <box style={{ height: 1, width: "100%", backgroundColor: theme.border }} />
-      <scrollbox
-        ref={scrollboxRef}
-        style={{ flexGrow: 1, scrollY: true }}
-      >
-        {results.length === 0 ? (
-      <text fg={theme.muted}>
-        {isLoading
-          ? "Searching..."
-          : query.trim() === ""
-            ? isGlobal
-              ? "Type to search globally..."
-              : "Type to search messages..."
-            : isGlobal
-              ? "No results"
-              : "No results"}
-      </text>
-        ) : (
-          results.map((msg, index) => (
-            <ResultItem
-              key={msg.id}
-              msg={msg}
-              isSelected={index === selectedIndex}
-              theme={theme}
-              query={query}
-            />
-          ))
-        )}
-      </scrollbox>
-      <text fg={theme.muted}>tab/shift+tab navigate • enter jump • esc close</text>
+      <box style={{ flexDirection: "column", width: "100%", height: "100%" }}>
+        <box style={{ flexDirection: "row", width: "100%" }}>
+          <text fg={theme.accent}>
+            {isGlobal ? "Global Search" : "Search"}: {query}
+          </text>
+        </box>
+        <box style={{ height: 1, width: "100%", backgroundColor: theme.border }} />
+        <scrollbox
+          ref={scrollboxRef}
+          style={{ width: "100%", height: scrollHeight, scrollY: true }}
+        >
+          {results.length === 0 ? (
+            <text fg={theme.muted}>
+              {isLoading
+                ? "Searching..."
+                : query.trim() === ""
+                  ? isGlobal
+                    ? "Type to search globally..."
+                    : "Type to search messages..."
+                  : isGlobal
+                    ? "No results"
+                    : "No results"}
+            </text>
+          ) : (
+            results.map((msg, index) => (
+              <ResultItem
+                key={msg.id}
+                msg={msg}
+                isSelected={index === selectedIndex}
+                theme={theme}
+                query={query}
+              />
+            ))
+          )}
+        </scrollbox>
+        <box style={{ flexDirection: "row", width: "100%" }}>
+          <text fg={theme.muted}>tab/shift+tab navigate • enter jump • esc close</text>
+        </box>
+      </box>
     </box>
   )
 }

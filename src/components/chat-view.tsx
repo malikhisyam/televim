@@ -130,15 +130,33 @@ function MessageBubble({
           {messageUrl ? (
             <text fg={fg}>
               <a href={messageUrl}><u>{message.content}</u></a>
+              {message.reactions && message.reactions.length > 0 ? (
+                <span fg={theme.muted}> {message.reactions.map(r => `${r.emoticon} ${r.count}`).join(' ')}</span>
+              ) : null}
             </text>
           ) : (
-            renderSegments(contentSegments, fg)
-          )}
-          {message.reactions && message.reactions.length > 0 ? (
-            <text fg={theme.muted}>
-              {message.reactions.map(r => `${r.emoticon}${r.count}`).join(' ')}
+            <text fg={fg}>
+              {contentSegments.map((seg, i) => {
+                let content: React.ReactNode = <span key={i}>{seg.text}</span>
+                if (seg.url) {
+                  content = <a key={i} href={seg.url}><u>{seg.text}</u></a>
+                }
+                if (seg.bold) {
+                  content = <strong key={i}>{content}</strong>
+                }
+                if (seg.italic) {
+                  content = <em key={i}>{content}</em>
+                }
+                if (seg.code || seg.pre) {
+                  content = <span key={i}>{content}</span>
+                }
+                return content
+              })}
+              {message.reactions && message.reactions.length > 0 ? (
+                <span fg={theme.muted}> {message.reactions.map(r => `${r.emoticon} ${r.count}`).join(' ')}</span>
+              ) : null}
             </text>
-          ) : null}
+          )}
         </box>
       </box>
     </box>
@@ -198,6 +216,22 @@ export default function ChatView() {
   const onlineIndicator = userStatus?.online ? " ●" : ""
   const pinnedMsg = activeChat ? pinnedMessages[activeChat.id] : undefined
 
+  // Auto-scroll to bottom when new messages are loaded
+  useEffect(() => {
+    if (!scrollboxRef.current || activeMessages.length === 0) return
+    // Only scroll to bottom if we're at the bottom (selected the newest message)
+    if (selectedMessageIndex === activeMessages.length - 1) {
+      const lastMsg = activeMessages[activeMessages.length - 1]
+      if (lastMsg) {
+        const id = `msg-${lastMsg.id}`
+        const timer = setTimeout(() => {
+          scrollboxRef.current.scrollChildIntoView?.(id)
+        }, 50)
+        return () => clearTimeout(timer)
+      }
+    }
+  }, [activeMessages.length])
+
   // Auto-scroll to keep the selected message in view
   useEffect(() => {
     if (!scrollboxRef.current || activeMessages.length === 0) return
@@ -212,7 +246,7 @@ export default function ChatView() {
       const targetScroll = selectedMessageIndex * itemHeight
       scrollboxRef.current.scrollTop = targetScroll
     }
-  }, [selectedMessageIndex, activeMessages])
+  }, [selectedMessageIndex])
 
   return (
     <box

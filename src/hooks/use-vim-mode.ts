@@ -203,22 +203,27 @@ export function useVimMode(options: UseVimModeOptions = {}) {
           consume()
           state.updateMessageSearchQuery((prev) => {
             const next = prev.slice(0, -1)
-            if (!state.messageSearchGlobal) {
+            const fresh = useStore.getState()
+            if (!fresh.messageSearchGlobal) {
               // Local search: re-filter results as query changes
-              const storeKey = `${state.activeChat?.id}${state.activeThreadId ? `:${state.activeThreadId}` : ""}`
-              const allMessages = state.messages[storeKey] ?? []
+              const storeKey = `${fresh.activeChat?.id}${fresh.activeThreadId ? `:${fresh.activeThreadId}` : ""}`
+              const allMessages = fresh.messages[storeKey] ?? []
               const filtered = next.trim() === ""
                 ? []
                 : allMessages.filter((m) =>
                     m.content.toLowerCase().includes(next.toLowerCase()) ||
                     m.senderName.toLowerCase().includes(next.toLowerCase()),
                   )
-              state.setMessageSearchResults(filtered)
-              if (state.messageSearchIndex >= filtered.length) {
-                state.setMessageSearchIndex(0)
+              fresh.setMessageSearchResults(filtered)
+              if (fresh.messageSearchIndex >= filtered.length) {
+                fresh.setMessageSearchIndex(0)
               }
             } else if (next.trim().length > 0) {
               opts.onSearchGlobal?.(next)
+            } else {
+              // Global search: clear results when query is empty
+              fresh.setMessageSearchResults([])
+              fresh.setMessageSearchIndex(0)
             }
             return next
           })
@@ -255,23 +260,28 @@ export function useVimMode(options: UseVimModeOptions = {}) {
           consume()
           state.updateMessageSearchQuery((prev) => {
             const next = prev + key.sequence
-            if (!state.messageSearchGlobal) {
+            const fresh = useStore.getState()
+            if (!fresh.messageSearchGlobal) {
               // Local search: re-filter results as query changes
-              const storeKey = `${state.activeChat?.id}${state.activeThreadId ? `:${state.activeThreadId}` : ""}`
-              const allMessages = state.messages[storeKey] ?? []
+              const storeKey = `${fresh.activeChat?.id}${fresh.activeThreadId ? `:${fresh.activeThreadId}` : ""}`
+              const allMessages = fresh.messages[storeKey] ?? []
               const filtered = next.trim() === ""
                 ? []
                 : allMessages.filter((m) =>
                     m.content.toLowerCase().includes(next.toLowerCase()) ||
                     m.senderName.toLowerCase().includes(next.toLowerCase()),
                   )
-              state.setMessageSearchResults(filtered)
-              if (state.messageSearchIndex >= filtered.length) {
-                state.setMessageSearchIndex(0)
+              fresh.setMessageSearchResults(filtered)
+              if (fresh.messageSearchIndex >= filtered.length) {
+                fresh.setMessageSearchIndex(0)
               }
             } else if (next.trim().length > 0) {
               // Global search: debounced API call via app.tsx
               opts.onSearchGlobal?.(next)
+            } else {
+              // Global search: clear results when query is empty
+              fresh.setMessageSearchResults([])
+              fresh.setMessageSearchIndex(0)
             }
             return next
           })
