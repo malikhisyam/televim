@@ -16,6 +16,8 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "start": "node dist/index.js",
+    "daemon": "node dist/index.js daemon",
+    "http": "node dist/http-server.js",
     "inspect": "npx @modelcontextprotocol/inspector node dist/index.js"
   },
   "keywords": [
