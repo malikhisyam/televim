@@ -15,19 +15,19 @@ export default function StatusBar() {
 
   let hint = ""
   if (forwardMessageId) {
-    hint = "FORWARD MODE: j/k select chat • enter forward • esc cancel"
+    hint = "j/k select • enter forward • esc cancel"
   } else if (actionMenuVisible) {
-    hint = "j/k navigate • enter confirm • esc close • r/y/f/p/e/d/t shortcut"
+    hint = "j/k navigate • enter confirm • esc close"
   } else if (mode === MODES.INSERT) {
-    hint = "esc normal mode • enter send"
+    hint = "esc normal • enter send"
   } else if (mode === MODES.COMMAND) {
-    hint = "enter execute • backspace delete • esc cancel"
+    hint = "enter run • backspace del • esc cancel"
   } else if (mode === MODES.SEARCH) {
-    hint = "enter select • backspace delete • esc cancel"
+    hint = "enter select • backspace del • esc cancel"
   } else if (paneFocus === "sidebar") {
-    hint = "j/k navigate • enter open/expand • l expand group • h collapse group • esc sidebar • i insert • : command • / search • q quit"
+    hint = "j/k navigate • enter open • l expand • h collapse • i insert • q quit • ?:help"
   } else {
-    hint = "j/k scroll messages • a action menu • o open link • s search msg • y copy • d delete • r reply • esc sidebar • i insert • : command • / search • q quit"
+    hint = "j/k scroll • a menu • i insert • esc sidebar • q quit • ?:help"
   }
 
   const cloakBadge = cloakMode ? "[CLOAK] " : ""
