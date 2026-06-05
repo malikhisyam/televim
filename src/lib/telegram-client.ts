@@ -1032,6 +1032,15 @@ function mapGramMessage(msg: any, chatId: number): Message {
     ? (msg.entities as any[]).map(mapEntity).filter((e): e is NonNullable<typeof e> => e !== null)
     : undefined
 
+  // Extract reactions from gram-js message
+  const reactions = msg.reactions?.results
+    ? (msg.reactions.results as any[]).map((r: any) => ({
+        emoticon: r.reaction?.emoticon || "❤️",
+        count: r.count || 1,
+        isSelected: r.chosenOrder !== undefined,
+      }))
+    : undefined
+
   return {
     id,
     chatId,
@@ -1046,6 +1055,7 @@ function mapGramMessage(msg: any, chatId: number): Message {
     threadId,
     isForwarded,
     forwardFromName,
+    reactions,
   }
 }
 
