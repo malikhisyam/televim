@@ -201,6 +201,8 @@ export default function ChatView() {
         borderStyle: "rounded",
         borderColor: theme.border,
         backgroundColor: theme.bg,
+        padding: 1,
+        gap: 0,
       }}
       title={`${title}${onlineIndicator}`}
       titleAlignment="left"

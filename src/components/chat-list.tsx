@@ -120,7 +120,9 @@ export default function ChatList() {
         borderStyle: "rounded",
         borderColor: theme.border,
         backgroundColor: theme.bg,
-        padding: 1,
+        paddingX: 1,
+        paddingY: 1,
+        paddingBottom: 4,
         gap: 0,
       }}
     >
