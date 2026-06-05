@@ -480,15 +480,6 @@ export function useVimMode(options: UseVimModeOptions = {}) {
         state.toggleHelp()
         return
       }
-      if (keyName === "s") {
-        consume()
-        state.setMessageSearchVisible(true)
-        state.setMessageSearchGlobal(false)
-        state.setMessageSearchQuery("")
-        state.setMessageSearchResults([])
-        state.setMessageSearchIndex(0)
-        return
-      }
       if (keyName === "S") {
         consume()
         state.setMessageSearchVisible(true)
@@ -618,6 +609,17 @@ export function useVimMode(options: UseVimModeOptions = {}) {
           return
         }
 
+        // Global search from sidebar
+        if (keyName === "s") {
+          consume()
+          state.setMessageSearchVisible(true)
+          state.setMessageSearchGlobal(true)
+          state.setMessageSearchQuery("")
+          state.setMessageSearchResults([])
+          state.setMessageSearchIndex(0)
+          return
+        }
+
         // Open chat / thread → switch focus to messages
         if (keyName === "return") {
           consume()
@@ -668,6 +670,15 @@ export function useVimMode(options: UseVimModeOptions = {}) {
         if (keyName === "k" || keyName === "up") {
           consume()
           opts.onNavigateMessage?.("prev", 1)
+          return
+        }
+        if (keyName === "s") {
+          consume()
+          state.setMessageSearchVisible(true)
+          state.setMessageSearchGlobal(false)
+          state.setMessageSearchQuery("")
+          state.setMessageSearchResults([])
+          state.setMessageSearchIndex(0)
           return
         }
 

@@ -28,7 +28,7 @@ export interface UseTelegramResult {
   submitPassword: (password: string) => void
   sendMessage: (chatId: number, text: string, threadId?: number, replyToMessageId?: number) => Promise<Message | null>
   sendFile: (chatId: number, filePath: string, caption?: string, threadId?: number, replyToMessageId?: number) => Promise<Message | null>
-  getMessages: (chatId: number, threadId?: number, limit?: number) => Promise<Message[]>
+  getMessages: (chatId: number, threadId?: number, limit?: number, offsetId?: number) => Promise<Message[]>
   getOlderMessages: (chatId: number, beforeId: number, threadId?: number, limit?: number) => Promise<Message[]>
   getForumTopics: (chatId: number) => Promise<Thread[]>
   markAsRead: (chatId: number, threadId?: number) => Promise<void>
@@ -321,8 +321,8 @@ export function useTelegram(): UseTelegramResult {
     return result || null
   }, [addMessage])
 
-  const getMessages = useCallback(async (chatId: number, threadId?: number, limit?: number) => {
-    const msgs = await clientRef.current?.getMessages(chatId, threadId, limit)
+  const getMessages = useCallback(async (chatId: number, threadId?: number, limit?: number, offsetId?: number) => {
+    const msgs = await clientRef.current?.getMessages(chatId, threadId, limit, offsetId)
     return msgs ?? []
   }, [])
 
