@@ -793,10 +793,26 @@ export class TelegramClient {
 
   private async setupUpdates(): Promise<void> {
     if (!this.gramClient) return
-    this.gramClient.addEventHandler((event) => {
-      const msg = event.message
+    this.gramClient.addEventHandler(async (event) => {
+      const msg = event.message as any
       if (!msg) return
       const chatId = getChatIdFromGramMessage(msg)
+      // Resolve sender if not available (NewMessage events often have PeerUser instead of User)
+      const rawSender = msg.sender
+      if (
+        (!rawSender || rawSender.className === "PeerUser" || rawSender.className === "PeerChannel") &&
+        this.gramClient &&
+        msg.senderId
+      ) {
+        try {
+          const sender = await this.gramClient.getEntity(msg.senderId)
+          if (sender) {
+            msg.sender = sender
+          }
+        } catch {
+          // ignore
+        }
+      }
       const mapped = mapGramMessage(msg, chatId)
       this.options.onNewMessage?.(mapped)
     }, new NewMessage({}))
@@ -990,11 +1006,22 @@ function extractMediaInfo(msg: any): { content: string; mediaType?: Message["med
 function mapGramMessage(msg: any, chatId: number): Message {
   const id = msg.id ? Number(msg.id) : Date.now()
   const sender = msg.sender
-  const senderName = sender
-    ? `${sender.firstName || ""} ${sender.lastName || ""}`.trim() ||
-      sender.title ||
-      "Unknown"
-    : "Unknown"
+  // Check if sender is a resolved entity (User/Channel) or a Peer object (PeerUser/PeerChannel)
+  let senderName = "Unknown"
+  let senderId: number | undefined
+  if (sender) {
+    if (sender.firstName !== undefined || sender.lastName !== undefined || sender.title !== undefined) {
+      // Resolved entity (User or Channel)
+      senderName = `${sender.firstName || ""} ${sender.lastName || ""}`.trim() || sender.title || "Unknown"
+      senderId = sender.id ? Number(sender.id) : undefined
+    } else if (sender.userId) {
+      // PeerUser object
+      senderId = Number(sender.userId)
+    } else if (sender.channelId) {
+      // PeerChannel object
+      senderId = Number(sender.channelId)
+    }
+  }
   const { content, mediaType, mediaSize } = extractMediaInfo(msg)
   const timestamp = msg.date ? new Date(msg.date * 1000) : new Date()
   const isOutgoing = msg.out === true
@@ -1045,6 +1072,7 @@ function mapGramMessage(msg: any, chatId: number): Message {
     id,
     chatId,
     senderName,
+    senderId,
     content,
     timestamp,
     isOutgoing,

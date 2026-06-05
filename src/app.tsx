@@ -299,6 +299,7 @@ function MainApp() {
       if (msg) {
         setReplyToMessageId(msg.id)
         state.setMode(MODES.INSERT)
+        state.bumpInputKey()
       }
     }, []),
 
@@ -319,6 +320,7 @@ function MainApp() {
         if (msg) {
           setReplyToMessageId(msg.id)
           state.setMode(MODES.INSERT)
+          state.bumpInputKey()
         }
       } else if (action === "copy") {
         const { messages, selectedMessageIndex } = state
@@ -352,6 +354,7 @@ function MainApp() {
         if (msg) {
           setEditMessageId(msg.id)
           state.setMode(MODES.INSERT)
+          state.bumpInputKey()
         }
       } else if (action === "react") {
         state.setReactionMenuVisible(true)
