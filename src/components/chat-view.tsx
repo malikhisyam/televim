@@ -126,22 +126,20 @@ function MessageBubble({
         <text fg={senderColor}>
           {message.senderName} {fullStr} {readIndicator}
         </text>
-        {messageUrl ? (
-          <text fg={fg}>
-            <a href={messageUrl}><u>{message.content}</u></a>
-          </text>
-        ) : (
-          renderSegments(contentSegments, fg)
-        )}
-        {message.reactions && message.reactions.length > 0 ? (
-          <box style={{ flexDirection: "row", gap: 1, marginTop: 0 }}>
-            {message.reactions.map((r, i) => (
-              <text key={i} fg={r.isSelected ? theme.accent : theme.muted}>
-                {r.emoticon} {r.count}
-              </text>
-            ))}
-          </box>
-        ) : null}
+        <box style={{ flexDirection: "row", gap: 1, flexWrap: "wrap" }}>
+          {messageUrl ? (
+            <text fg={fg}>
+              <a href={messageUrl}><u>{message.content}</u></a>
+            </text>
+          ) : (
+            renderSegments(contentSegments, fg)
+          )}
+          {message.reactions && message.reactions.length > 0 ? (
+            <text fg={theme.muted}>
+              {message.reactions.map(r => `${r.emoticon}${r.count}`).join(' ')}
+            </text>
+          ) : null}
+        </box>
       </box>
     </box>
   )
