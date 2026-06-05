@@ -76,12 +76,6 @@ export default function MessageSearchOverlay() {
     }
   }, [selectedIndex, results])
 
-  // Calculate the inner height for the scrollbox
-  // Total overlay height is 60% of terminal
-  // Query text: ~1 row, separator: 1 row, hint: ~1 row, padding: 2 rows
-  // So scrollbox should get the rest
-  const scrollHeight = 16  // approximate height in rows
-
   return (
     <box
       style={{
@@ -99,16 +93,14 @@ export default function MessageSearchOverlay() {
         overflow: "hidden",
       }}
     >
-      <box style={{ flexDirection: "column", width: "100%", height: "100%" }}>
-        <box style={{ flexDirection: "row", width: "100%" }}>
-          <text fg={theme.accent}>
-            {isGlobal ? "Global Search" : "Search"}: {query}
-          </text>
-        </box>
-        <box style={{ height: 1, width: "100%", backgroundColor: theme.border }} />
+      <text fg={theme.accent}>
+        {isGlobal ? "Global Search" : "Search"}: {query}
+      </text>
+      <box style={{ height: 1, width: "100%", backgroundColor: theme.border }} />
+      <box style={{ flexGrow: 1, width: "100%", overflow: "hidden" }}>
         <scrollbox
           ref={scrollboxRef}
-          style={{ width: "100%", height: scrollHeight, scrollY: true }}
+          style={{ height: "100%", width: "100%", scrollY: true }}
         >
           {results.length === 0 ? (
             <text fg={theme.muted}>
@@ -134,10 +126,8 @@ export default function MessageSearchOverlay() {
             ))
           )}
         </scrollbox>
-        <box style={{ flexDirection: "row", width: "100%" }}>
-          <text fg={theme.muted}>tab/shift+tab navigate • enter jump • esc close</text>
-        </box>
       </box>
+      <text fg={theme.muted}>tab/shift+tab navigate • enter jump • esc close</text>
     </box>
   )
 }
