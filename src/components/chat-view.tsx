@@ -82,18 +82,31 @@ function MessageBubble({
   // Format message content with Telegram entities
   const contentSegments = formatEntities(message.content, message.entities)
 
+  const bubbleStyle: any = {
+    flexDirection: "column",
+    paddingX: 1,
+    paddingY: 0,
+    gap: 0,
+    ...(isSelected
+      ? {
+          backgroundColor: bg,
+          border: true,
+          borderStyle: "rounded",
+          borderColor: bg,
+        }
+      : {}),
+  }
+
   return (
     <box
       id={`msg-${message.id}`}
       style={{
-        width: "100%",
         paddingX: 1,
-        paddingY: 0,
-        backgroundColor: bg,
+        paddingY: 1,
         justifyContent: align,
       }}
     >
-      <box style={{ flexDirection: "column", padding: 1, gap: 0 }}>
+      <box style={bubbleStyle}>
         {repliedTo ? (
           <box style={{ flexDirection: "row", gap: 0, marginBottom: 0 }}>
             <box style={{ width: 1, height: 2, backgroundColor: theme.accent }} />
