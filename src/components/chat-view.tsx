@@ -147,11 +147,16 @@ const SCROLLBAR_OPTS = {
 
 export default function ChatView() {
   const theme = useStore((s) => s.theme)
+  const mode = useStore((s) => s.mode)
+  const paneFocus = useStore((s) => s.paneFocus)
   const activeChat = useStore((s) => s.activeChat)
   const activeThreadId = useStore((s) => s.activeThreadId)
   const messages = useStore((s) => s.messages)
   const selectedMessageIndex = useStore((s) => s.selectedMessageIndex)
   const scrollboxRef = useRef<any>(null)
+
+  const isFocused = paneFocus === "messages" && mode === "normal"
+  const borderColor = isFocused ? theme.accent : theme.border
 
   const activeMessages = activeChat ? messages[`${activeChat.id}${activeThreadId ? `:${activeThreadId}` : ""}`] ?? [] : []
   const isLoadingOlder = useStore((s) => s.isLoadingOlderMessages)
@@ -199,8 +204,10 @@ export default function ChatView() {
         flexDirection: "column",
         border: true,
         borderStyle: "rounded",
-        borderColor: theme.border,
+        borderColor: borderColor,
         backgroundColor: theme.bg,
+        padding: 1,
+        gap: 0,
       }}
       title={`${title}${onlineIndicator}`}
       titleAlignment="left"

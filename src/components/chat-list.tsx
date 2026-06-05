@@ -85,10 +85,15 @@ const SCROLLBAR_OPTS = {
 
 export default function ChatList() {
   const theme = useStore((s) => s.theme)
+  const mode = useStore((s) => s.mode)
+  const paneFocus = useStore((s) => s.paneFocus)
   const chats = useStore((s) => s.chats)
   const expandedChatIds = useStore((s) => s.expandedChatIds)
   const selectedListIndex = useStore((s) => s.selectedListIndex)
   const scrollboxRef = useRef<any>(null)
+
+  const isFocused = paneFocus === "sidebar" && mode === "normal"
+  const borderColor = isFocused ? theme.accent : theme.border
 
   const visibleItems = getVisibleItems(chats, expandedChatIds)
 
@@ -118,9 +123,11 @@ export default function ChatList() {
         flexDirection: "column",
         border: true,
         borderStyle: "rounded",
-        borderColor: theme.border,
+        borderColor: borderColor,
         backgroundColor: theme.bg,
-        padding: 1,
+        paddingX: 1,
+        paddingY: 1,
+        paddingBottom: 4,
         gap: 0,
       }}
     >

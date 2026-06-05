@@ -11,6 +11,7 @@ interface InputBarProps {
 
 export default function InputBar({ onSendMessage, focused }: InputBarProps) {
   const theme = useStore((s) => s.theme)
+  const mode = useStore((s) => s.mode)
   const activeChat = useStore((s) => s.activeChat)
   const activeThreadId = useStore((s) => s.activeThreadId)
   const drafts = useStore((s) => s.drafts)
@@ -20,6 +21,9 @@ export default function InputBar({ onSendMessage, focused }: InputBarProps) {
   const messages = useStore((s) => s.messages)
   const setReplyToMessageId = useStore((s) => s.setReplyToMessageId)
   const setEditMessageId = useStore((s) => s.setEditMessageId)
+
+  const isFocused = mode === "insert"
+  const borderColor = isFocused ? theme.accent : theme.border
 
   const draftKey = activeChat ? msgStoreKey(activeChat.id, activeThreadId) : ""
   const savedDraft = drafts[draftKey] ?? ""
@@ -98,7 +102,7 @@ export default function InputBar({ onSendMessage, focused }: InputBarProps) {
         backgroundColor: theme.bg,
         border: true,
         borderStyle: "rounded",
-        borderColor: theme.border,
+        borderColor: borderColor,
         paddingX: 1,
         paddingY: 0,
       }}
