@@ -110,7 +110,7 @@ function MessageBubble({
             <box style={{ width: 1, height: 2, backgroundColor: theme.accent }} />
             <box style={{ flexDirection: "column", paddingLeft: 1 }}>
               <text fg={isSelected ? theme.bg : theme.accent}>
-                {repliedTo.senderName}
+                ↳ {repliedTo.senderName}
               </text>
               <text fg={isSelected ? theme.bg : theme.muted}>
                 {repliedTo.content.slice(0, 50)}
@@ -133,6 +133,15 @@ function MessageBubble({
         ) : (
           renderSegments(contentSegments, fg)
         )}
+        {message.reactions && message.reactions.length > 0 ? (
+          <box style={{ flexDirection: "row", gap: 1, marginTop: 0 }}>
+            {message.reactions.map((r, i) => (
+              <text key={i} fg={r.isSelected ? theme.accent : theme.muted}>
+                {r.emoticon} {r.count}
+              </text>
+            ))}
+          </box>
+        ) : null}
       </box>
     </box>
   )
@@ -144,7 +153,8 @@ const MemoMessageBubble = memo(MessageBubble, (prev, next) => {
     prev.isSelected === next.isSelected &&
     prev.isRead === next.isRead &&
     prev.allMessages.length === next.allMessages.length &&
-    JSON.stringify(prev.message.entities) === JSON.stringify(next.message.entities)
+    JSON.stringify(prev.message.entities) === JSON.stringify(next.message.entities) &&
+    JSON.stringify(prev.message.reactions) === JSON.stringify(next.message.reactions)
   )
 })
 

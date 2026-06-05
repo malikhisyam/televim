@@ -42,6 +42,17 @@ export default function StatusBar() {
   const activeTyping = activeChat ? typingUsers[activeChat.id] : undefined
   const typingText = activeTyping ? `${activeTyping.name} is typing...` : ""
 
+  // Connection status indicator
+  const connectionStatus = useStore((s) => s.connectionStatus)
+  const connectionIndicator = connectionStatus === "error" ? "● " : connectionStatus === "connecting" ? "◐ " : ""
+  const connectionColor = connectionStatus === "error" ? theme.error : connectionStatus === "connecting" ? theme.warning : theme.success
+
+  // Download progress indicator
+  const downloadProgress = useStore((s) => s.downloadProgress)
+  const downloadText = downloadProgress
+    ? `↓ ${downloadProgress.fileName} ${downloadProgress.percent}%`
+    : ""
+
   return (
     <box
       style={{
@@ -66,9 +77,13 @@ export default function StatusBar() {
       )}
       {typingText ? (
         <text fg={theme.accent}>{typingText}</text>
+      ) : downloadText ? (
+        <text fg={theme.accent}>{downloadText}</text>
       ) : mode === MODES.COMMAND ? (
         <text fg={theme.muted}>type :help for keybindings</text>
-      ) : null}
+      ) : (
+        <text fg={connectionColor}>{connectionIndicator}</text>
+      )}
     </box>
   )
 }

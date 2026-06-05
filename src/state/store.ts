@@ -157,6 +157,14 @@ export interface TeleVimState {
   notificationsEnabled: boolean
   toggleNotifications: () => void
 
+  // Connection status
+  connectionStatus: "connected" | "connecting" | "disconnected" | "error"
+  setConnectionStatus: (status: "connected" | "connecting" | "disconnected" | "error") => void
+
+  // Download progress
+  downloadProgress: { fileName: string; percent: number } | null
+  setDownloadProgress: (progress: { fileName: string; percent: number } | null) => void
+
   // Reset helpers
   resetToNormal: () => void
 }
@@ -437,6 +445,12 @@ export const useStore = create<TeleVimState>((set, get) => ({
   notificationsEnabled: true,
   toggleNotifications: () =>
     set((state) => ({ notificationsEnabled: !state.notificationsEnabled })),
+
+  connectionStatus: "disconnected",
+  setConnectionStatus: (connectionStatus) => set({ connectionStatus }),
+
+  downloadProgress: null,
+  setDownloadProgress: (downloadProgress) => set({ downloadProgress }),
 
   helpVisible: false,
   toggleHelp: () => set((state) => ({ helpVisible: !state.helpVisible })),

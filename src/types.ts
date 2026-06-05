@@ -18,6 +18,12 @@ export interface Chat {
   threads?: Thread[]
 }
 
+export interface MessageReaction {
+  emoticon: string
+  count: number
+  isSelected?: boolean
+}
+
 export interface Message {
   id: number
   chatId: number
@@ -32,6 +38,7 @@ export interface Message {
   mediaType?: "photo" | "video" | "file" | "audio" | "voice" | "sticker" | "gif" | "location" | "poll" | "contact" | "unknown"
   mediaSize?: number // bytes
   entities?: MessageEntity[]
+  reactions?: MessageReaction[]
 }
 
 export interface MessageEntity {

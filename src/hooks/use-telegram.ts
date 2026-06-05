@@ -87,6 +87,16 @@ export function useTelegram(): UseTelegramResult {
 
   const onStatusChange = useCallback((newStatus: ConnectionStatus, error?: string) => {
     setStatus(newStatus)
+    const state = useStore.getState()
+    if (newStatus === "connected") {
+      state.setConnectionStatus("connected")
+    } else if (newStatus === "connecting") {
+      state.setConnectionStatus("connecting")
+    } else if (newStatus === "error" || newStatus === "disconnected") {
+      state.setConnectionStatus("error")
+    } else {
+      state.setConnectionStatus("disconnected")
+    }
     if (error?.startsWith("qr:")) {
       const rest = error.slice(3) // remove "qr:" prefix
       const lastColon = rest.lastIndexOf(":")
@@ -374,8 +384,18 @@ export function useTelegram(): UseTelegramResult {
   }, [])
 
   const downloadMedia = useCallback(async (messageId: number, chatId: number, destPath: string) => {
-    const result = await clientRef.current?.downloadMedia(messageId, chatId, destPath)
-    return result || null
+    const state = useStore.getState()
+    state.setDownloadProgress({ fileName: destPath.split("/").pop() || "file", percent: 0 })
+    try {
+      const result = await clientRef.current?.downloadMedia(messageId, chatId, destPath)
+      state.setDownloadProgress({ fileName: destPath.split("/").pop() || "file", percent: 100 })
+      // Clear after a short delay
+      setTimeout(() => state.setDownloadProgress(null), 2000)
+      return result || null
+    } catch {
+      state.setDownloadProgress(null)
+      return null
+    }
   }, [])
 
   const disconnect = useCallback(async () => {
