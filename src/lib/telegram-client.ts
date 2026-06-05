@@ -371,7 +371,7 @@ export class TelegramClient {
     }
   }
 
-  async getMessages(chatId: number, threadId?: number, limit = 50): Promise<Message[]> {
+  async getMessages(chatId: number, threadId?: number, limit = 50, offsetId?: number): Promise<Message[]> {
     if (!this.gramClient) return []
     try {
       const entity = await this.gramClient.getEntity(chatId)
@@ -379,7 +379,7 @@ export class TelegramClient {
       // Use gram-js getMessages which properly wraps raw API objects
       const msgs = await this.gramClient.getMessages(entity, {
         limit,
-        offsetId: 0,
+        offsetId: offsetId || 0,
         ...(threadId ? { replyTo: threadId } : {}),
       })
 

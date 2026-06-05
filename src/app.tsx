@@ -188,7 +188,9 @@ function MainApp() {
       state.setSelectedMessageIndex(0)
       maybeMarkAsRead(chat.id, threadId)
       const storeKey = `${chat.id}${threadId ? `:${threadId}` : ""}`
-      void telegram.getMessages(chat.id, threadId, 50).then((msgs) => {
+      // If targetMessageId is provided, load messages around it (offsetId = targetMessageId + 1 to include the target)
+      const offsetId = targetMessageId ? targetMessageId + 1 : undefined
+      void telegram.getMessages(chat.id, threadId, 50, offsetId).then((msgs) => {
         const fresh = useStore.getState()
         if (msgs.length > 0) {
           fresh.setMessages({

@@ -3,19 +3,50 @@
 import { memo, useEffect, useRef } from "react"
 import { useStore } from "../state/store"
 
+function HighlightedText({
+  text,
+  query,
+  fg,
+  highlightFg,
+}: {
+  text: string
+  query: string
+  fg: string
+  highlightFg: string
+}) {
+  if (!query) return <text fg={fg}>{text}</text>
+  const lowerText = text.toLowerCase()
+  const lowerQuery = query.toLowerCase()
+  const index = lowerText.indexOf(lowerQuery)
+  if (index === -1) return <text fg={fg}>{text}</text>
+  const before = text.slice(0, index)
+  const match = text.slice(index, index + query.length)
+  const after = text.slice(index + query.length)
+  return (
+    <text fg={fg}>
+      {before}
+      <span fg={highlightFg}>{match}</span>
+      {after}
+    </text>
+  )
+}
+
 const ResultItem = memo(function ResultItem({
   msg,
   isSelected,
   theme,
+  query,
 }: {
   msg: { id: number; senderName: string; content: string; timestamp: Date }
   isSelected: boolean
   theme: { bg: string; accent: string; fg: string; muted: string }
+  query: string
 }) {
   const timeStr = msg.timestamp.toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
   })
+  const displayContent = msg.content.slice(0, 60)
   return (
     <box
       id={`search-${msg.id}`}
@@ -30,9 +61,12 @@ const ResultItem = memo(function ResultItem({
       <text fg={isSelected ? theme.bg : theme.fg}>
         {msg.senderName} {timeStr}
       </text>
-      <text fg={isSelected ? theme.bg : theme.muted}>
-        {msg.content.slice(0, 60)}
-      </text>
+      <HighlightedText
+        text={displayContent}
+        query={query}
+        fg={isSelected ? theme.bg : theme.muted}
+        highlightFg={isSelected ? theme.bg : theme.accent}
+      />
     </box>
   )
 })
@@ -102,6 +136,7 @@ export default function MessageSearchOverlay() {
               msg={msg}
               isSelected={index === selectedIndex}
               theme={theme}
+              query={query}
             />
           ))
         )}
