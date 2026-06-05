@@ -1,0 +1,43 @@
+{
+  "name": "televim-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for Telegram via TeleVim — send messages, read chats, and automate Telegram workflows",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "televim-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js",
+    "inspect": "npx @modelcontextprotocol/inspector node dist/index.js"
+  },
+  "keywords": [
+    "mcp",
+    "telegram",
+    "automation",
+    "bot",
+    "cli",
+    "model-context-protocol"
+  ],
+  "author": "Hisyam Malik",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "telegram": "^2.26.22",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  }
+}
