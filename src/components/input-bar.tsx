@@ -103,7 +103,7 @@ export default function InputBar({ onSendMessage, focused }: InputBarProps) {
         border: true,
         borderStyle: "rounded",
         borderColor: borderColor,
-        paddingX: 1,
+        paddingX: 0,
         paddingY: 0,
       }}
     >
