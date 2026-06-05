@@ -90,9 +90,6 @@ function MessageBubble({
     ...(isSelected
       ? {
           backgroundColor: bg,
-          border: true,
-          borderStyle: "rounded",
-          borderColor: bg,
         }
       : {}),
   }
@@ -101,8 +98,9 @@ function MessageBubble({
     <box
       id={`msg-${message.id}`}
       style={{
-        paddingX: 1,
-        paddingY: 1,
+        paddingX: 0,
+        paddingY: 0,
+        marginBottom: 1,
         justifyContent: align,
       }}
     >
