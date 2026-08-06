@@ -9,6 +9,7 @@ import { join } from "path"
 const CONFIG_DIR = join(homedir(), ".config", "televim")
 const SESSION_DIR = join(CONFIG_DIR, "sessions")
 const CONFIG_FILE = join(CONFIG_DIR, "config.json")
+const MEDIA_DIR = join(CONFIG_DIR, "media")
 
 const DEFAULT_API_ID = 2040
 const DEFAULT_API_HASH = "b18441a1ff607e10a989891a5462e627"
@@ -72,6 +73,7 @@ export interface MessageInfo {
   date: Date
   isOutgoing: boolean
   replyToId?: number
+  mediaPath?: string
 }
 
 export interface ContactInfo {
@@ -81,6 +83,8 @@ export interface ContactInfo {
   username?: string
   phone?: string
 }
+
+type ChatRef = number | string
 
 export class TelegramMcpClient {
   private gramClient: GramClient | null = null
@@ -175,40 +179,52 @@ export class TelegramMcpClient {
     return chats
   }
 
-  async getMessages(chatId: number, limit = 50): Promise<MessageInfo[]> {
+  async getMessages(chatId: ChatRef, limit = 50): Promise<MessageInfo[]> {
     if (!this.gramClient) throw new Error("Not connected")
 
-    const peer = await this.gramClient.getEntity(chatId)
+    const peer = await this.getPeer(chatId)
     if (!peer) {
       throw new Error("Chat " + chatId + " not found")
     }
 
+    const resolvedChatId = this.extractId(peer)
     const messages = await this.gramClient.getMessages(peer, { limit })
     const result: MessageInfo[] = []
 
     for (const msg of messages) {
-      if (!msg.message) continue
+      const media = (msg as any).media
+      const hasPhoto = Boolean(
+        (msg as any).photo ||
+        media instanceof Api.MessageMediaPhoto ||
+        media?.className === "MessageMediaPhoto"
+      )
+      if (!msg.message && !hasPhoto) continue
 
       const sender = await this.getSenderName(msg.senderId)
+      let mediaPath: string | undefined
+      if (hasPhoto) {
+        mediaPath = await this.downloadPhoto(msg, resolvedChatId)
+      }
       result.push({
         id: msg.id,
-        chatId,
+        chatId: resolvedChatId,
         senderId: msg.senderId?.toJSNumber() || 0,
         senderName: sender,
-        content: msg.message || "",
+        content: msg.message || "[Image]",
         date: new Date(msg.date * 1000),
         isOutgoing: msg.out || false,
         replyToId: msg.replyTo?.replyToMsgId,
+        mediaPath,
       })
     }
 
     return result.reverse()
   }
 
-  async sendMessage(chatId: number, text: string, replyToId?: number): Promise<void> {
+  async sendMessage(chatId: ChatRef, text: string, replyToId?: number): Promise<void> {
     if (!this.gramClient) throw new Error("Not connected")
 
-    const peer = await this.gramClient.getEntity(chatId)
+    const peer = await this.getPeer(chatId)
     if (!peer) {
       throw new Error("Chat " + chatId + " not found")
     }
@@ -219,10 +235,10 @@ export class TelegramMcpClient {
     })
   }
 
-  async searchMessages(chatId: number, query: string, limit = 50): Promise<MessageInfo[]> {
+  async searchMessages(chatId: ChatRef, query: string, limit = 50): Promise<MessageInfo[]> {
     if (!this.gramClient) throw new Error("Not connected")
 
-    const peer = await this.gramClient.getEntity(chatId)
+    const peer = await this.getPeer(chatId)
     if (!peer) {
       throw new Error("Chat " + chatId + " not found")
     }
@@ -246,7 +262,7 @@ export class TelegramMcpClient {
       const sender = await this.getSenderName(msg.fromId)
       messages.push({
         id: msg.id,
-        chatId,
+        chatId: this.extractId(peer),
         senderId: msg.senderId ? msg.senderId.toJSNumber() : 0,
         senderName: sender,
         content: msg.message || "",
@@ -282,10 +298,10 @@ export class TelegramMcpClient {
     return contacts.sort((a, b) => a.firstName.localeCompare(b.firstName))
   }
 
-  async markAsRead(chatId: number): Promise<void> {
+  async markAsRead(chatId: ChatRef): Promise<void> {
     if (!this.gramClient) throw new Error("Not connected")
 
-    const peer = await this.gramClient.getEntity(chatId)
+    const peer = await this.getPeer(chatId)
     if (!peer) {
       throw new Error("Chat " + chatId + " not found")
     }
@@ -312,6 +328,28 @@ export class TelegramMcpClient {
       // ignore
     }
     return "Unknown"
+  }
+
+  private async getPeer(chatId: ChatRef): Promise<any> {
+    if (!this.gramClient) throw new Error("Not connected")
+    const ref = typeof chatId === "string" ? chatId.replace(/^@/, "") : chatId
+    return this.gramClient.getEntity(ref)
+  }
+
+  private async downloadPhoto(msg: any, chatId: number): Promise<string | undefined> {
+    if (!this.gramClient) return undefined
+    try {
+      if (!existsSync(MEDIA_DIR)) mkdirSync(MEDIA_DIR, { recursive: true })
+      const path = join(MEDIA_DIR, `${chatId}-${msg.id}.jpg`)
+      if (existsSync(path)) return path
+      const data = await this.gramClient.downloadMedia(msg)
+      if (!data) return undefined
+      const buffer = Buffer.isBuffer(data) ? data : Buffer.from(data as any)
+      writeFileSync(path, buffer)
+      return path
+    } catch {
+      return undefined
+    }
   }
 
   private extractId(entity: any): number {

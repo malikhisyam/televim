@@ -52,7 +52,7 @@ export async function createMcpServer(accountName = "default") {
           inputSchema: {
             type: "object",
             properties: {
-              chatId: { type: "number", description: "Chat ID (from get_chat_list)" },
+              chatId: { type: ["number", "string"], description: "Chat ID or username" },
               limit: { type: "number", description: "Max messages to return (default 50)", default: 50 },
             },
             required: ["chatId"],
@@ -64,7 +64,7 @@ export async function createMcpServer(accountName = "default") {
           inputSchema: {
             type: "object",
             properties: {
-              chatId: { type: "number", description: "Chat ID to send to" },
+              chatId: { type: ["number", "string"], description: "Chat ID or username" },
               text: { type: "string", description: "Message text" },
               replyToId: { type: "number", description: "Message ID to reply to (optional)" },
             },
@@ -77,7 +77,7 @@ export async function createMcpServer(accountName = "default") {
           inputSchema: {
             type: "object",
             properties: {
-              chatId: { type: "number", description: "Chat ID to search in" },
+              chatId: { type: ["number", "string"], description: "Chat ID or username" },
               query: { type: "string", description: "Search keyword" },
               limit: { type: "number", description: "Max results (default 50)", default: 50 },
             },
@@ -98,7 +98,7 @@ export async function createMcpServer(accountName = "default") {
           inputSchema: {
             type: "object",
             properties: {
-              chatId: { type: "number", description: "Chat ID to mark as read" },
+              chatId: { type: ["number", "string"], description: "Chat ID or username" },
             },
             required: ["chatId"],
           },
@@ -130,7 +130,7 @@ export async function createMcpServer(accountName = "default") {
         }
 
         case "get_messages": {
-          const chatId = args?.chatId as number
+          const chatId = args?.chatId as number | string
           const limit = (args?.limit as number) || 50
           if (!chatId) throw new McpError(ErrorCode.InvalidParams, "chatId is required")
           const messages = await tg.getMessages(chatId, limit)
@@ -145,7 +145,7 @@ export async function createMcpServer(accountName = "default") {
         }
 
         case "send_message": {
-          const chatId = args?.chatId as number
+          const chatId = args?.chatId as number | string
           const text = args?.text as string
           const replyToId = args?.replyToId as number | undefined
           if (!chatId || !text) throw new McpError(ErrorCode.InvalidParams, "chatId and text are required")
@@ -161,7 +161,7 @@ export async function createMcpServer(accountName = "default") {
         }
 
         case "search_messages": {
-          const chatId = args?.chatId as number
+          const chatId = args?.chatId as number | string
           const query = args?.query as string
           const limit = (args?.limit as number) || 50
           if (!chatId || !query) throw new McpError(ErrorCode.InvalidParams, "chatId and query are required")
@@ -189,7 +189,7 @@ export async function createMcpServer(accountName = "default") {
         }
 
         case "mark_as_read": {
-          const chatId = args?.chatId as number
+          const chatId = args?.chatId as number | string
           if (!chatId) throw new McpError(ErrorCode.InvalidParams, "chatId is required")
           await tg.markAsRead(chatId)
           return {
