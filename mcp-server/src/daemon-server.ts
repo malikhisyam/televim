@@ -340,6 +340,22 @@ export async function createDaemonMcpServer(accountName = "default") {
           }
         }
 
+        case "get_chat_list": {
+          if (!daemon.isConnected) {
+            await daemon.connect()
+          }
+          const limit = Math.min((args?.limit as number) || 50, 200)
+          const chats = await daemon.getChatList(limit)
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(chats, null, 2),
+              },
+            ],
+          }
+        }
+
         case "disconnect_daemon": {
           await daemon.disconnect()
           isListening = false
