@@ -160,7 +160,7 @@ export class TelegramDaemon {
         chatId: chatId,
         chatTitle: "",
         threadId: message.replyTo?.replyToTopId,
-        senderId: message.senderId ? (typeof message.senderId === "number" ? message.senderId : Number(message.senderId)) : 0,
+        senderId: message.senderId ? message.senderId.toJSNumber() : 0,
         senderName: sender,
         content: content,
         date: new Date(message.date * 1000).toISOString(),
@@ -269,6 +269,59 @@ export class TelegramDaemon {
 
   getUnprocessedMessages(): QueuedMessage[] {
     return this.queue.filter(m => !m.processed)
+  }
+
+  async getChatList(limit = 50): Promise<Array<{ id: number; title: string; type: string; unreadCount: number; lastMessage?: string }>> {
+    if (!this.gramClient) throw new Error("Not connected")
+
+    const dialogs = await this.gramClient.getDialogs({ limit })
+    const chats: Array<{ id: number; title: string; type: string; unreadCount: number; lastMessage?: string }> = []
+
+    for (const dialog of dialogs) {
+      const entity = await this.gramClient.getEntity(dialog.inputEntity)
+      if (!entity) continue
+
+      const chatId = this.extractId(entity)
+      let title: string
+      if ("title" in entity) {
+        title = entity.title
+      } else if ("firstName" in entity) {
+        const firstName = entity.firstName || ""
+        const lastName = entity.lastName || ""
+        title = (firstName + " " + lastName).trim()
+      } else {
+        title = "Unknown"
+      }
+
+      let lastMessage: string | undefined
+      if (dialog.message) {
+        lastMessage = dialog.message.message || "[Media]"
+      }
+
+      chats.push({
+        id: chatId,
+        title,
+        type: this.getChatType(entity),
+        unreadCount: dialog.unreadCount || 0,
+        lastMessage,
+      })
+    }
+
+    return chats
+  }
+
+  private extractId(entity: any): number {
+    if ("id" in entity) return entity.id.toJSNumber()
+    return 0
+  }
+
+  private getChatType(entity: any): string {
+    if (entity instanceof Api.User || entity instanceof Api.UserEmpty) return "private"
+    if (entity instanceof Api.Chat || entity instanceof Api.ChatEmpty) return "group"
+    if (entity instanceof Api.Channel) {
+      return entity.megagroup ? "supergroup" : "channel"
+    }
+    return "group"
   }
 
   markProcessed(messageId: number): void {

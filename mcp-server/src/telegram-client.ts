@@ -247,7 +247,7 @@ export class TelegramMcpClient {
       messages.push({
         id: msg.id,
         chatId,
-        senderId: msg.fromId ? Number(msg.fromId) : 0,
+        senderId: msg.senderId ? msg.senderId.toJSNumber() : 0,
         senderName: sender,
         content: msg.message || "",
         date: new Date(msg.date * 1000),
@@ -290,8 +290,9 @@ export class TelegramMcpClient {
       throw new Error("Chat " + chatId + " not found")
     }
 
+    const lastMessage = (await this.gramClient.getMessages(peer, { limit: 1 }))[0]
     await this.gramClient.invoke(
-      new Api.messages.ReadHistory({ peer, maxId: 0 })
+      new Api.messages.ReadHistory({ peer, maxId: lastMessage?.id ?? 0 })
     )
   }
 
